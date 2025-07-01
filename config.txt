@@ -7,10 +7,11 @@ issia_val_cameras=5,6
 spd_path=/kaggle/input/foot-and-ball-1/SoccerPlayerDetection_bmvc17_v1
 spd_set=1,2
 
-epochs=10 #20
+epochs=10 
 lr=1e-3
-batch_size=8 #12
-num_workers=4 #8
+batch_size=8 
+num_workers=4 
+#20,1e-3,12,8
 
 model=fb1
 
