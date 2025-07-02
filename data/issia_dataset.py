@@ -110,7 +110,7 @@ class IssiaDataset(torch.utils.data.Dataset):
             boxes.append((player_x, player_y, player_x + player_width, player_y + player_height))
             labels.append(PLAYER_LABEL)
 
-        return np.array(boxes, dtype=np.float), np.array(labels, dtype=np.int64)
+        return np.array(boxes, dtype=float), np.array(labels, dtype=np.int64)
 
     def get_elems_with_ball(self):
         # Get indexes of images with ball ground truth
