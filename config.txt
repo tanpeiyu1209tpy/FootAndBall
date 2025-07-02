@@ -11,7 +11,7 @@ spd_set=
 
 epochs=10 
 lr=1e-3
-batch_size=12 
+batch_size=16 
 num_workers=2
 #20,1e-3,12,8
 
