@@ -466,9 +466,9 @@ def extract_frames(dataset_path, camera_id, frames_path):
             break
 
         #file_path = os.path.join(frames_path, str(count_frames) + '.png')
-        #cv2.imwrite(file_path, frame, [cv2.IMWRITE_PNG_COMPRESSION, 0])
+	#cv2.imwrite(file_path, frame, [cv2.IMWRITE_PNG_COMPRESSION, 0])
 	file_path = os.path.join(frames_path, f"{count_frames}.jpg")
-        cv2.imwrite(file_path, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+	cv2.imwrite(file_path, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
         
 
     sequence.release()
