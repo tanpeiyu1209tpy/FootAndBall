@@ -30,7 +30,7 @@ class IssiaDataset(torch.utils.data.Dataset):
         self.cameras = cameras
         self.transform = transform
         self.only_ball_frames = only_ball_frames
-        self.image_extension = '.png'
+        self.image_extension = '.jpg'
         # Dictionary with ground truth annotations per camera
         self.gt_annotations = {}
         # list of images as tuples (image_path, camera_id, image index)
