@@ -10,7 +10,7 @@ spd_set=1,2
 epochs=10 
 lr=1e-3
 batch_size=8 
-num_workers=4 
+num_workers=2 
 #20,1e-3,12,8
 
 model=fb1
