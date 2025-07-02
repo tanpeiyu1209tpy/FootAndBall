@@ -62,8 +62,10 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
             batch_stats = {'loss': [], 'loss_ball_c': [], 'loss_player_c': [], 'loss_player_l': []}
 
             count_batches = 0
+            print("📦 Preparing to load first batch...")
             # Iterate over data.
             for ndx, (images, boxes, labels) in enumerate(dataloaders[phase]):
+                print(f"✅ Batch {ndx} loaded")
                 images = images.to(device)
                 h, w = images.shape[-2], images.shape[-1]
                 gt_maps = model.groundtruth_maps(boxes, labels, (h, w))
