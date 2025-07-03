@@ -55,6 +55,8 @@ def plot_eval_history(history, model_name):
             
 def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, model_name):
     eval_history = []
+    best_map = -1.0 
+    #best_model_path = None
     # Weight for components of the loss function.
     # Ball-related loss and player-related loss are mean losses (loss per one positive example)
     alpha_l_player = 0.01
