@@ -1,55 +1,56 @@
 import torch
 import numpy as np
+import torchvision
+from torchvision.ops import box_iou
 from collections import defaultdict
 from data.augmentation import PLAYER_LABEL, BALL_LABEL
 
-def compute_iou(box1, box2):
-    """Compute IoU between two boxes or box arrays. Boxes in [x1, y1, x2, y2] format."""
-    # If inputs are tensors, continue. If not, convert.
-    if not isinstance(box1, torch.Tensor): box1 = torch.tensor(box1)
-    if not isinstance(box2, torch.Tensor): box2 = torch.tensor(box2)
-
-    x1 = torch.max(box1[0], box2[0])
-    y1 = torch.max(box1[1], box2[1])
-    x2 = torch.min(box1[2], box2[2])
-    y2 = torch.min(box1[3], box2[3])
-
-    inter_area = (x2 - x1).clamp(min=0) * (y2 - y1).clamp(min=0)
-
-    area1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
-    area2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
-
-    union = area1 + area2 - inter_area + 1e-6
-    return inter_area / union
-
 def average_precision(pred_boxes, gt_boxes, iou_threshold=0.5):
-    if len(pred_boxes) == 0:
+    if len(pred_boxes) == 0 or len(gt_boxes) == 0:
         return 0.0
-    pred_boxes = sorted(pred_boxes, key=lambda x: -x[1])  # sort by confidence
+
+    # Sort predictions by descending confidence
+    pred_boxes = sorted(pred_boxes, key=lambda x: -x[1])
+    pred_boxes_tensor = torch.tensor([p[0] for p in pred_boxes], dtype=torch.float32)
+    scores = [p[1] for p in pred_boxes]
+    pred_labels = [p[2] for p in pred_boxes]
+
+    gt_boxes_tensor = torch.tensor([g[0] for g in gt_boxes], dtype=torch.float32)
+    gt_labels = [g[1] for g in gt_boxes]
+
+    # Compute IoU matrix
+    iou_matrix = box_iou(pred_boxes_tensor, gt_boxes_tensor)  # shape: (N_pred, N_gt)
+
     tp = np.zeros(len(pred_boxes))
     fp = np.zeros(len(pred_boxes))
-    matched = set()
+    matched_gt = set()
 
-    for i, (p_box, p_score, p_label) in enumerate(pred_boxes):
-        found = False
-        for j, (g_box, g_label) in enumerate(gt_boxes):
-            if j in matched or p_label != g_label:
+    for i in range(len(pred_boxes)):
+        best_iou = 0.0
+        best_j = -1
+        for j in range(len(gt_boxes)):
+            if j in matched_gt:
                 continue
-            iou = compute_iou(p_box, g_box)
-            if iou >= iou_threshold:
-                found = True
-                matched.add(j)
-                break
-        tp[i] = 1 if found else 0
-        fp[i] = 0 if found else 1
+            if pred_labels[i] != gt_labels[j]:
+                continue
+            iou = iou_matrix[i, j].item()
+            if iou >= iou_threshold and iou > best_iou:
+                best_iou = iou
+                best_j = j
+        if best_j >= 0:
+            tp[i] = 1
+            matched_gt.add(best_j)
+        else:
+            fp[i] = 1
 
     cum_tp = np.cumsum(tp)
     cum_fp = np.cumsum(fp)
     precisions = cum_tp / (cum_tp + cum_fp + 1e-6)
     recalls = cum_tp / len(gt_boxes)
+    
     ap = 0.0
     for t in np.linspace(0, 1, 11):
-        p = np.max(precisions[recalls >= t]) if np.sum(recalls >= t) > 0 else 0
+        p = np.max(precisions[recalls >= t]) if np.any(recalls >= t) else 0
         ap += p / 11
     return ap
 
@@ -75,6 +76,10 @@ def eval_model(model, dataloader, device):
 
                 gt = [(boxes[i][j].numpy(), labels[i][j].item()) for j in range(len(labels[i]))]
                 all_gt.append(gt)
+
+                if i == 0:
+                    print("第一张图的第一个预测框：", pred_boxes[0])
+                    print("第一张图的第一个GT框：", boxes[i][0])
 
     results = {}
     for label_id, label_name in [(BALL_LABEL, 'Ball AP'), (PLAYER_LABEL, 'Player AP')]:
