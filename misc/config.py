@@ -20,11 +20,9 @@ class Params:
         if self.issia_path is not None:
             temp = params.get('issia_train_cameras', '1, 2, 3, 4')
             self.issia_train_cameras = [int(e) for e in temp.split(',')]
-            temp = params.get('issia_val_cameras', '5')
+            temp = params.get('issia_val_cameras', '5, 6')
             self.issia_val_cameras = [int(e) for e in temp.split(',')]
-            temp = params.get('issia_test_cameras', '6')
-            self.issia_test_cameras = [int(e) for e in temp.split(',')]
-
+            
 
         self.spd_path = params.get('spd_path', None)
         if self.spd_path is not None:
@@ -47,8 +45,6 @@ class Params:
         for c in self.issia_train_cameras:
             assert 1 <= c <= 6, 'ISSIA CNR camera number must be between 1 and 6. Is: {}'.format(c)
         for c in self.issia_val_cameras:
-            assert 1 <= c <= 6, 'ISSIA CNR camera number must be between 1 and 6. Is: {}'.format(c)
-        for c in self.issia_test_cameras:
             assert 1 <= c <= 6, 'ISSIA CNR camera number must be between 1 and 6. Is: {}'.format(c)
         for c in self.spd_set:
             assert c == 1 or c == 2, 'SPD dataset number must be 1 or 2. Is: {}'.format(c)
