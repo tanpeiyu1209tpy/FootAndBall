@@ -39,7 +39,22 @@ def plot_losses(training_stats, model_name):
         plt.savefig(f'{model_name}_{loss_key}.png')
         plt.close()
 
+def plot_eval_history(history, model_name):
+    import matplotlib.pyplot as plt
+    keys = ['Ball AP', 'Player AP', 'mAP']
+    for key in keys:
+        values = [e[key] for e in history if key in e]
+        plt.figure()
+        plt.plot(values, label=key)
+        plt.xlabel('Epoch')
+        plt.ylabel('AP')
+        plt.title(key)
+        plt.grid(True)
+        plt.savefig(f'{model_name}_{key.replace(" ", "_")}.png')
+        plt.close()
+            
 def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, model_name):
+    eval_history = []
     # Weight for components of the loss function.
     # Ball-related loss and player-related loss are mean losses (loss per one positive example)
     alpha_l_player = 0.01
@@ -138,6 +153,11 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
     # Draw and save loss graphs
     plot_losses(training_stats, model_name)
 
+    with open(f'eval_history_{model_name}.pickle', 'wb') as f:
+        pickle.dump(eval_history, f)
+
+    plot_eval_history(eval_history, model_name)
+        
     return training_stats
 
 
