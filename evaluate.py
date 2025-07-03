@@ -77,11 +77,6 @@ def eval_model(model, dataloader, device):
                 gt = [(boxes[i][j].numpy(), labels[i][j].item()) for j in range(len(labels[i]))]
                 all_gt.append(gt)
 
-                if i == 0:
-                    print("第一张图的第一个预测框：", pred_boxes[0])
-                    print("第一张图的第一个GT框：", boxes[i][0])
-
-            break
     results = {}
     for label_id, label_name in [(BALL_LABEL, 'Ball AP'), (PLAYER_LABEL, 'Player AP')]:
         pred_cls = [p for img_p in all_pred for p in img_p if p[2] == label_id]
