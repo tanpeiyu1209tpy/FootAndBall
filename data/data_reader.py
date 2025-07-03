@@ -22,6 +22,11 @@ def make_dataloaders(params: Params):
         else:
             val_issia_dataset = create_issia_dataset(params.issia_path, params.issia_val_cameras, mode='val',
                                                      only_ball_frames=True)
+        
+        if hasattr(params, 'issia_test_cameras') and len(params.issia_test_cameras) > 0:
+            test_issia_dataset = create_issia_dataset(params.issia_path, params.issia_test_cameras, mode='test', only_ball_frames=True)
+        else:
+            test_issia_dataset = None
 
     if params.spd_set is None:
         train_spd_dataset = None
@@ -32,6 +37,10 @@ def make_dataloaders(params: Params):
     if val_issia_dataset is not None:
         dataloaders['val'] = DataLoader(val_issia_dataset, batch_size=2, num_workers=params.num_workers,
                                         pin_memory=True, collate_fn=my_collate)
+    if test_issia_dataset is not None:
+        dataloaders['test'] = DataLoader(test_issia_dataset, batch_size=2, num_workers=params.num_workers, 
+                                         pin_memory=True, collate_fn=my_collate)
+
 
     train_dataset = ConcatDataset([train_issia_dataset, train_spd_dataset])
     batch_sampler = BalancedSampler(train_dataset)
