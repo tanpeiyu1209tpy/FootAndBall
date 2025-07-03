@@ -136,11 +136,17 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
         scheduler.step()
 
         if is_validation_set:
-            print("🔍 Running evaluation on validation set...")
+            print("Running evaluation on validation set...")
             model.phase = 'detect'  # 切换到 detect 模式
             eval_results = eval_model(model, dataloaders['val'], device)
             model.phase = 'train'   # 还原回来
             eval_history.append(eval_results)
+
+            if eval_results['mAP'] > best_map:
+                best_map = eval_results['mAP']
+                best_model_path = os.path.join(MODEL_FOLDER, model_name + '_best.pth')
+                torch.save(model.state_dict(), best_model_path)
+                print(f"Saved new best model: {best_model_path} with mAP {best_map:.4f}")
         
         print('')
 
@@ -153,10 +159,10 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
     # Draw and save loss graphs
     plot_losses(training_stats, model_name)
 
-    with open(f'eval_history_{model_name}.pickle', 'wb') as f:
-        pickle.dump(eval_history, f)
-
-    plot_eval_history(eval_history, model_name)
+    if is_validation_set:
+        with open(f'eval_history_{model_name}.pickle', 'wb') as f:
+            pickle.dump(eval_history, f)
+        plot_eval_history(eval_history, model_name)
         
     return training_stats
 
