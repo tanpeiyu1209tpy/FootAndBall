@@ -44,8 +44,9 @@ def plot_eval_history(history, model_name):
     keys = ['Ball AP', 'Player AP', 'mAP']
     for key in keys:
         values = [e[key] for e in history if key in e]
+        epochs = [e['epoch'] for e in history if key in e]
         plt.figure()
-        plt.plot(values, label=key)
+        plt.plot(epochs, values, label=key)
         plt.xlabel('Epoch')
         plt.ylabel('AP')
         plt.title(key)
@@ -140,7 +141,10 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
             model.phase = 'detect'  # 切换到 detect 模式
             eval_results = eval_model(model, dataloaders['val'], device)
             model.phase = 'train'   # 还原回来
-            eval_history.append(eval_results)
+            eval_history.append({
+                'epoch': epoch + 1,
+                **eval_results
+            })
         
         print('')
 
@@ -157,6 +161,11 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
         pickle.dump(eval_history, f)
 
     plot_eval_history(eval_history, model_name)
+
+    if len(eval_history) > 0:
+        best_epoch = max(eval_history, key=lambda x: x['mAP'])['epoch']
+        best_map = max(eval_history, key=lambda x: x['mAP'])['mAP']
+        print(f"Best mAP = {best_map:.3f} at epoch {best_epoch}")
         
     return training_stats
 
