@@ -2,8 +2,25 @@ import torch
 import numpy as np
 from collections import defaultdict
 from data.augmentation import PLAYER_LABEL, BALL_LABEL
-from network.nms import compute_iou
 
+def compute_iou(box1, box2):
+    """Compute IoU between two boxes or box arrays. Boxes in [x1, y1, x2, y2] format."""
+    # If inputs are tensors, continue. If not, convert.
+    if not isinstance(box1, torch.Tensor): box1 = torch.tensor(box1)
+    if not isinstance(box2, torch.Tensor): box2 = torch.tensor(box2)
+
+    x1 = torch.max(box1[0], box2[0])
+    y1 = torch.max(box1[1], box2[1])
+    x2 = torch.min(box1[2], box2[2])
+    y2 = torch.min(box1[3], box2[3])
+
+    inter_area = (x2 - x1).clamp(min=0) * (y2 - y1).clamp(min=0)
+
+    area1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    area2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
+
+    union = area1 + area2 - inter_area + 1e-6
+    return inter_area / union
 
 def average_precision(pred_boxes, gt_boxes, iou_threshold=0.5):
     if len(pred_boxes) == 0:
