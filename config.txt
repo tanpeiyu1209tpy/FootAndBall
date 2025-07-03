@@ -2,8 +2,7 @@
 
 issia_path=/kaggle/working/foot-and-ball
 issia_train_cameras=1,2,3,4
-issia_val_cameras=5
-issia_test_cameras=6
+issia_val_cameras=5,6
 
 #spd_path=
 #spd_set=0
