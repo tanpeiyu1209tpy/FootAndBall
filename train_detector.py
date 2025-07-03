@@ -15,6 +15,7 @@ import time
 
 import torch
 import torch.optim as optim
+import matplotlib.pyplot as plt
 
 from network import footandball
 from data.data_reader import make_dataloaders
@@ -23,6 +24,19 @@ from misc.config import Params
 
 MODEL_FOLDER = 'models'
 
+def plot_losses(training_stats, model_name):
+    for loss_key in ['loss', 'loss_ball_c', 'loss_player_c', 'loss_player_l']:
+        plt.figure()
+        for phase in training_stats:
+            values = [e[loss_key] for e in training_stats[phase]]
+            plt.plot(values, label=phase)
+        plt.title(loss_key)
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(f'{model_name}_{loss_key}.png')
+        plt.close()
 
 def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, model_name):
     # Weight for components of the loss function.
@@ -111,6 +125,9 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
 
     with open('training_stats_{}.pickle'.format(model_name), 'wb') as handle:
         pickle.dump(training_stats, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    # Draw and save loss graphs
+    plot_losses(training_stats, model_name)
 
     return training_stats
 
