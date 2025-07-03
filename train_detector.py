@@ -21,6 +21,7 @@ from network import footandball
 from data.data_reader import make_dataloaders
 from network.ssd_loss import SSDLoss
 from misc.config import Params
+from evaluate import eval_model
 
 MODEL_FOLDER = 'models'
 
@@ -118,6 +119,14 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
 
         # Scheduler step
         scheduler.step()
+
+        if is_validation_set:
+            print("🔍 Running evaluation on validation set...")
+            model.phase = 'detect'  # 切换到 detect 模式
+            eval_results = eval_model(model, dataloaders['val'], device)
+            model.phase = 'train'   # 还原回来
+            eval_history.append(eval_results)
+        
         print('')
 
     model_filepath = os.path.join(MODEL_FOLDER, model_name + '_final' + '.pth')
