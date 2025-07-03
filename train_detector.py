@@ -88,6 +88,7 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
 
                 with torch.set_grad_enabled(phase == 'train'):
                     predictions = model(images)
+                    print(predictions)  
                     # Backpropagation
                     optimizer.zero_grad()
                     loss_l_player, loss_c_player, loss_c_ball = criterion(predictions, gt_maps)
