@@ -39,7 +39,7 @@ def average_precision(pred_boxes, gt_boxes, iou_threshold=0.5):
 
 def eval_model(model, dataloader, device):
     model.eval()
-    model.phase = 'detect'  # 必须切换为 detect 模式
+    model.phase = 'detect'
 
     all_pred = []
     all_gt = []
@@ -49,7 +49,6 @@ def eval_model(model, dataloader, device):
             images = images.to(device)
             detections = model(images)
             for i in range(len(detections)):
-                # pred
                 preds = detections[i]
                 pred_boxes = preds['boxes'].cpu().numpy()
                 scores = preds['scores'].cpu().numpy()
@@ -57,14 +56,15 @@ def eval_model(model, dataloader, device):
                 pred = [(pred_boxes[j], scores[j], cls[j]) for j in range(len(pred_boxes))]
                 all_pred.append(pred)
 
-                # gt
                 gt = [(boxes[i][j].numpy(), labels[i][j].item()) for j in range(len(labels[i]))]
                 all_gt.append(gt)
 
+    results = {}
     for label_id, label_name in [(BALL_LABEL, 'Ball AP'), (PLAYER_LABEL, 'Player AP')]:
         pred_cls = [p for img_p in all_pred for p in img_p if p[2] == label_id]
         gt_cls = [g for img_g in all_gt for g in img_g if g[1] == label_id]
         ap = average_precision(pred_cls, gt_cls)
+        results[label_name] = ap
         print(f"{label_name}: {ap:.4f}")
 
     aps = []
@@ -72,5 +72,6 @@ def eval_model(model, dataloader, device):
         pred_cls = [p for img_p in all_pred for p in img_p if p[2] == label_id]
         gt_cls = [g for img_g in all_gt for g in img_g if g[1] == label_id]
         aps.append(average_precision(pred_cls, gt_cls))
-    print(f"mAP: {np.mean(aps):.4f}")
-
+    results['mAP'] = np.mean(aps)
+    print(f"mAP: {results['mAP']:.4f}")
+    return results
