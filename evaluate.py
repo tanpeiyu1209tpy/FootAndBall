@@ -2,7 +2,8 @@ import torch
 import numpy as np
 from collections import defaultdict
 from data.augmentation import PLAYER_LABEL, BALL_LABEL
-from network.nms import compute_iou  # 或者你用 evaluate.py 里定义的 compute_iou
+from network.nms import compute_iou
+
 
 def average_precision(pred_boxes, gt_boxes, iou_threshold=0.5):
     if len(pred_boxes) == 0:
@@ -46,7 +47,7 @@ def eval_model(model, dataloader, device):
     with torch.no_grad():
         for images, boxes, labels in dataloader:
             images = images.to(device)
-            detections = model(images)  # 自动 decode & NMS
+            detections = model(images)
             for i in range(len(detections)):
                 # pred
                 preds = detections[i]
@@ -60,17 +61,16 @@ def eval_model(model, dataloader, device):
                 gt = [(boxes[i][j].numpy(), labels[i][j].item()) for j in range(len(labels[i]))]
                 all_gt.append(gt)
 
-    # 计算 AP
     for label_id, label_name in [(BALL_LABEL, 'Ball AP'), (PLAYER_LABEL, 'Player AP')]:
         pred_cls = [p for img_p in all_pred for p in img_p if p[2] == label_id]
         gt_cls = [g for img_g in all_gt for g in img_g if g[1] == label_id]
         ap = average_precision(pred_cls, gt_cls)
         print(f"{label_name}: {ap:.4f}")
 
-    # mAP
     aps = []
     for label_id in [BALL_LABEL, PLAYER_LABEL]:
         pred_cls = [p for img_p in all_pred for p in img_p if p[2] == label_id]
         gt_cls = [g for img_g in all_gt for g in img_g if g[1] == label_id]
         aps.append(average_precision(pred_cls, gt_cls))
     print(f"mAP: {np.mean(aps):.4f}")
+
