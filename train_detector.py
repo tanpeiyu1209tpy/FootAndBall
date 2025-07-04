@@ -55,7 +55,8 @@ def plot_eval_history(history, model_name):
             
 def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, model_name):
     eval_history = []
-    best_map = -1.0 
+    best_map = -1.0
+    #best_epoch = None
     #best_model_path = None
     # Weight for components of the loss function.
     # Ball-related loss and player-related loss are mean losses (loss per one positive example)
@@ -93,7 +94,7 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
 
             batch_stats = {'loss': [], 'loss_ball_c': [], 'loss_player_c': [], 'loss_player_l': []}
 
-            count_batches = 0
+            #count_batches = 0
             #print("📦 Preparing to load first batch...")
             # Iterate over data.
             for ndx, (images, boxes, labels) in enumerate(dataloaders[phase]):
@@ -102,7 +103,7 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
                 h, w = images.shape[-2], images.shape[-1]
                 gt_maps = model.groundtruth_maps(boxes, labels, (h, w))
                 gt_maps = [e.to(device) for e in gt_maps]
-                count_batches += 1
+                #count_batches += 1
 
                 with torch.set_grad_enabled(phase == 'train'):
                     predictions = model(images)
@@ -118,7 +119,7 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
                         optimizer.step()
 
                 # statistics
-                count_batches += 1
+                #count_batches += 1
                 batch_stats['loss'].append(loss.item())
                 batch_stats['loss_ball_c'].append(loss_c_ball.item())
                 batch_stats['loss_player_c'].append(loss_c_player.item())
@@ -146,11 +147,13 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
 
             if eval_results['mAP'] > best_map:
                 best_map = eval_results['mAP']
+                best_epoch = epoch + 1  # epoch 是从 0 开始的，加 1 更直观
                 best_model_path = os.path.join(MODEL_FOLDER, model_name + '_best.pth')
                 torch.save(model.state_dict(), best_model_path)
                 print(f"Saved new best model: {best_model_path} with mAP {best_map:.4f}")
-        
-        print('')
+    
+                with open(f'best_model_info_{model_name}.txt', 'w') as f:
+                    f.write(f"Best mAP: {best_map:.4f} at epoch {best_epoch}\n")
 
     model_filepath = os.path.join(MODEL_FOLDER, model_name + '_final' + '.pth')
     torch.save(model.state_dict(), model_filepath)
