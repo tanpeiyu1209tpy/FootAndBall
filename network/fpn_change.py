@@ -12,7 +12,7 @@ cfg = {
 }
 
 
-def make_modules(cfg, batch_norm=False):
+def make_modules(cfg, batch_norm=False, in_channels=3):
     # Each module is a list of sequential layers operating at the same spacial dimension followed by MaxPool2d
     modules = nn.ModuleList()
     # Number of output channels in each module
