@@ -327,13 +327,18 @@ def build_footandball_detector1(phase='train', max_player_detections=100, max_ba
     # phase: 'train' or 'test'
     assert phase in ['train', 'test', 'detect']
 
-    layers, out_channels = fpn.make_modules(fpn.cfg['X'], batch_norm=True)
+
+    num_input_frames = 3  # 可以先设置为 3 帧
+    in_channels = 3 * num_input_frames
+    layers, out_channels = fpn.make_modules(fpn.cfg['X'], batch_norm=True, in_channels=in_channels)
+                                    
+    #layers, out_channels = fpn.make_modules(fpn.cfg['X'], batch_norm=True)
     # FPN returns 3 tensors for each input: one dowscaled 4 times in each input dimension, the other downscaled 16 times
     # tensor with 2 channels downscaled 4 times is used for ball detection
     # tensor with 2 channels downscaled 16 times is used for the player detection (1 location corresponds to 16x16 pixel block)
     # tensor with 4 channels downscaled 16 times is used for the player bbox regression
     lateral_channels = 32
-    i_channels = 32
+    i_channels = 32 
 
     base_net = fpn.FPN(layers, out_channels=out_channels, lateral_channels=lateral_channels, return_layers=[1, 3])
     ball_classifier = nn.Sequential(nn.Conv2d(lateral_channels, out_channels=i_channels, kernel_size=3, padding=1),
