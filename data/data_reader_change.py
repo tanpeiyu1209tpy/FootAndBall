@@ -10,6 +10,26 @@ from data.issia_dataset import create_issia_dataset, IssiaDataset
 from data.spd_bmvc2017_dataset import create_spd_dataset
 from misc.config import Params
 
+class MultiFrameWrapperDataset(torch.utils.data.Dataset):
+    def __init__(self, dataset, num_frames=3):
+        self.dataset = dataset
+        self.num_frames = num_frames
+
+    def __len__(self):
+        return len(self.dataset) - self.num_frames + 1
+
+    def __getitem__(self, index):
+        frames = []
+        boxes = []
+        labels = []
+        for i in range(self.num_frames):
+            img, b, l = self.dataset[index + i]
+            frames.append(img)
+            boxes.append(b)
+            labels.append(l)
+        stacked = torch.cat(frames, dim=0)  # [3 * N, H, W]
+        return stacked, boxes[-1], labels[-1]  # 用最后一帧的标注
+
 
 def make_dataloaders(params: Params):
     if params.issia_path is None:
@@ -33,8 +53,9 @@ def make_dataloaders(params: Params):
         dataloaders['val'] = DataLoader(val_issia_dataset, batch_size=2, num_workers=params.num_workers,
                                         pin_memory=True, collate_fn=my_collate)
     
-    train_dataset = ConcatDataset([train_issia_dataset, train_spd_dataset])
-    batch_sampler = BalancedSampler(train_dataset)
+    raw_concat_dataset  = ConcatDataset([train_issia_dataset, train_spd_dataset])
+    batch_sampler = BalancedSampler(raw_concat_dataset )
+    train_dataset   = MultiFrameWrapperDataset(raw_concat_dataset , num_frames=3)
     dataloaders['train'] = DataLoader(train_dataset, sampler=batch_sampler, batch_size=params.batch_size,
                                       num_workers=params.num_workers, pin_memory=True, collate_fn=my_collate)
 
