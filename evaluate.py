@@ -7,20 +7,18 @@ from data.augmentation import PLAYER_LABEL, BALL_LABEL
 
 def average_precision(pred_boxes, gt_boxes, iou_threshold=0.5):
     if len(pred_boxes) == 0 or len(gt_boxes) == 0:
+        print("Warning: empty prediction or ground truth for this class")
         return 0.0
 
-    # Sort predictions by descending confidence
     pred_boxes = sorted(pred_boxes, key=lambda x: -x[1])
-    pred_boxes_tensor = torch.tensor([p[0] for p in pred_boxes], dtype=torch.float32)
+    pred_boxes_tensor = torch.as_tensor([np.array(p[0]) for p in pred_boxes], dtype=torch.float32)
     scores = [p[1] for p in pred_boxes]
     pred_labels = [p[2] for p in pred_boxes]
 
-    gt_boxes_tensor = torch.tensor([g[0] for g in gt_boxes], dtype=torch.float32)
+    gt_boxes_tensor = torch.as_tensor([np.array(g[0]) for g in gt_boxes], dtype=torch.float32)
     gt_labels = [g[1] for g in gt_boxes]
 
-    # Compute IoU matrix
-    iou_matrix = box_iou(pred_boxes_tensor, gt_boxes_tensor)  # shape: (N_pred, N_gt)
-
+    iou_matrix = box_iou(pred_boxes_tensor, gt_boxes_tensor)
     tp = np.zeros(len(pred_boxes))
     fp = np.zeros(len(pred_boxes))
     matched_gt = set()
@@ -29,9 +27,7 @@ def average_precision(pred_boxes, gt_boxes, iou_threshold=0.5):
         best_iou = 0.0
         best_j = -1
         for j in range(len(gt_boxes)):
-            if j in matched_gt:
-                continue
-            if pred_labels[i] != gt_labels[j]:
+            if j in matched_gt or pred_labels[i] != gt_labels[j]:
                 continue
             iou = iou_matrix[i, j].item()
             if iou >= iou_threshold and iou > best_iou:
@@ -46,8 +42,8 @@ def average_precision(pred_boxes, gt_boxes, iou_threshold=0.5):
     cum_tp = np.cumsum(tp)
     cum_fp = np.cumsum(fp)
     precisions = cum_tp / (cum_tp + cum_fp + 1e-6)
-    recalls = cum_tp / len(gt_boxes)
-    
+    recalls = cum_tp / max(len(gt_boxes), 1)  # 修复点
+
     ap = 0.0
     for t in np.linspace(0, 1, 11):
         p = np.max(precisions[recalls >= t]) if np.any(recalls >= t) else 0
