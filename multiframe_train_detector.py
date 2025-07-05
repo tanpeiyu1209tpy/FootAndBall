@@ -13,7 +13,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 
 # Import both original and multi-frame components
-from network import footandball
+from network import multiframe_footandball
 from network.multiframe_footandball import multiframe_model_factory
 from data.multiframe_data_reader import make_multiframe_dataloaders, DataLoaderConfig
 from data.data_reader import make_dataloaders  # Original for backward compatibility
