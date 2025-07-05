@@ -88,9 +88,6 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
 
             for ndx, (images, boxes, labels) in enumerate(dataloaders[phase]):
                 images = images.to(device)
-                
-                if epoch == 0 and ndx == 0:
-                    print("[DEBUG] Batch input shape:", images.shape)
 
                 h, w = images.shape[-2], images.shape[-1]
                 
