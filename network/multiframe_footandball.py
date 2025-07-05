@@ -9,7 +9,7 @@ import network.nms as nms
 from data.multiframe_augmentation import BALL_LABEL, PLAYER_LABEL, BALL_BBOX_SIZE
 
 # Import multi-frame FPN (assuming it's in the same fpn module)
-from network.multiframe_fpn import MultiFrameFPN, create_multiframe_fpn
+from network.multiframe_fpn import MultiFrameFusionFPN  
 
 
 class MultiFrameFootAndBall(nn.Module):
@@ -228,7 +228,7 @@ def build_multiframe_footandball_detector(phase='train', num_frames=3, max_playe
     lateral_channels = 32
     i_channels = 32
     
-    base_net = create_multiframe_fpn(
+    base_net = MultiFrameFusionFPN(
         cfg_name='X', 
         num_frames=num_frames, 
         batch_norm=True, 
