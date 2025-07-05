@@ -9,10 +9,10 @@ issia_val_cameras=5
 #spd_path=/kaggle/working/SoccerPlayerDetection_bmvc17_v1
 #spd_set=1,2
 
-epochs=3 
+epochs=1 
 lr=1e-3
-batch_size=12 
-num_workers=2
+batch_size=16 
+num_workers=8
 #20,1e-3,12,8
 
 model=fb1
