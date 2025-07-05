@@ -162,6 +162,15 @@ class MultiFrameIssiaDataset(torch.utils.data.Dataset):
 
         boxes = torch.tensor(boxes, dtype=torch.float)
         labels = torch.tensor(labels, dtype=torch.int64)
+
+        print("[DEBUG] transform output type:", type(images))
+        if isinstance(images, list):
+            print("[DEBUG] number of frames:", len(images))
+            print("[DEBUG] one frame shape:", images[0].shape)
+            multi_frame_image = torch.cat(images, dim=0)
+            print("[DEBUG] final input shape:", multi_frame_image.shape)
+        else:
+            print("[DEBUG] single image shape:", images.shape)
         
         return multi_frame_image, boxes, labels
 
