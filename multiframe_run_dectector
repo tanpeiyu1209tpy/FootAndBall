@@ -112,7 +112,7 @@ def run_detector_multiframe(model: footandball.MultiFrameFootAndBall, args: argp
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', help='path to video', type=str, required=True)
-    parser.add_argument('--model', help='model name', type=str, default='fb1')
+    parser.add_argument('--model', help='model name', type=str, default='mf_fb1')
     parser.add_argument('--weights', help='path to model weights', type=str, required=True)
     parser.add_argument('--ball_threshold', help='ball confidence detection threshold', type=float, default=0.5)
     parser.add_argument('--player_threshold', help='player confidence detection threshold', type=float, default=0.5)
