@@ -35,7 +35,7 @@ def make_multiframe_dataloaders(params: Params, num_frames=3, frame_interval=1, 
             only_ball_frames=False,
             num_frames=num_frames,
             frame_interval=frame_interval,
-            temporal_strategy=temporal_strategy
+            temporal_strategy=temporal_strategy,
             transform=transform
         )
         
