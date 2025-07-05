@@ -5,9 +5,8 @@ import random
 import torch
 from torch.utils.data import Sampler, DataLoader, ConcatDataset
 
-from data.issia_dataset import create_issia_dataset, IssiaDataset
 # Import multi-frame dataset (assuming it's in the same module)
-from data.issia_dataset import create_multiframe_issia_dataset, MultiFrameIssiaDataset
+from data.multiframe_issia_dataset import create_multiframe_issia_dataset, MultiFrameIssiaDataset
 from misc.config import Params
 
 
