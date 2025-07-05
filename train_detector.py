@@ -21,7 +21,7 @@ from network import footandball
 from data.data_reader import make_dataloaders
 from network.ssd_loss import SSDLoss
 from misc.config import Params
-from evaluate import eval_model
+#from evaluate import eval_model
 
 MODEL_FOLDER = 'models'
 
