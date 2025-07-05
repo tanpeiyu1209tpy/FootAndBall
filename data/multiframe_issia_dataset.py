@@ -214,5 +214,5 @@ def create_multiframe_issia_dataset(dataset_path, cameras, mode, only_ball_frame
 
     dataset = MultiFrameIssiaDataset(dataset_path, cameras, transform=transform, only_ball_frames=only_ball_frames,
                                    num_frames=num_frames, frame_interval=frame_interval, 
-                                   temporal_strategy=temporal_strategy， transform=transform)
+                                   temporal_strategy=temporal_strategy, transform=transform)
     return dataset
