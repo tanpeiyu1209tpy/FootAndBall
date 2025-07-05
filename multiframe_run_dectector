@@ -16,7 +16,7 @@ from collections import deque
 import numpy as np
 
 import network.footandball as footandball
-import data.multiframe_augmentation as augmentations
+import data.augmentation as augmentations
 from data.multiframe_augmentation import PLAYER_LABEL, BALL_LABEL
 import metric  # Assumes metric.py is in same directory
 
