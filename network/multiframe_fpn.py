@@ -85,6 +85,7 @@ class MultiFrameFPN(nn.Module):
 
         # Optional: Add a 1x1 conv layer to reduce channels from multi-frame input
         # This can help the network learn better representations from temporal information
+        '''
         if input_channels > 3:
             self.temporal_fusion = nn.Sequential(
                 nn.Conv2d(input_channels, input_channels // 2, kernel_size=1, stride=1, padding=0),
@@ -96,6 +97,8 @@ class MultiFrameFPN(nn.Module):
             )
         else:
             self.temporal_fusion = None
+        '''
+        self.temporal_fusion = None
 
     def _upsample_add(self, x, y):
         '''Upsample and add two feature maps.
@@ -110,9 +113,7 @@ class MultiFrameFPN(nn.Module):
 
     def forward(self, x):
         # Optional temporal fusion step
-        print("[DEBUG] input x shape before fusion:", x.shape)
         if self.temporal_fusion is not None:
-            print("[DEBUG] using temporal_fusion:", self.temporal_fusion)
             x = self.temporal_fusion(x)
         
         # Bottom-up pass, store all intermediary feature maps in list c
