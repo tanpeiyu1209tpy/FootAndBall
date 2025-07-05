@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 # Import both original and multi-frame components
 from network import multiframe_footandball
 from network.multiframe_footandball import multiframe_model_factory
-from data.multiframe_data_reader import make_multiframe_dataloaders, DataLoaderConfig
+from data.multiframe_data_reader import make_multiframe_dataloaders
 from data.data_reader import make_dataloaders  # Original for backward compatibility
 from network.ssd_loss import SSDLoss
 from misc.config import Params
