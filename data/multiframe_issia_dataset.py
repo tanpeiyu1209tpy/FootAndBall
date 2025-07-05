@@ -198,7 +198,7 @@ class MultiFrameIssiaDataset(torch.utils.data.Dataset):
 
 
 def create_multiframe_issia_dataset(dataset_path, cameras, mode, only_ball_frames=False, 
-                                   num_frames=3, frame_interval=1, temporal_strategy='center'):
+                                   num_frames=3, frame_interval=1, temporal_strategy='center', transform=None):
     # Get multi-frame ISSIA datasets for multiple cameras
     assert mode == 'train' or mode == 'val'
     assert os.path.exists(dataset_path), 'Cannot find dataset: ' + str(dataset_path)
@@ -211,7 +211,7 @@ def create_multiframe_issia_dataset(dataset_path, cameras, mode, only_ball_frame
     elif mode == 'val':
         transform = augmentation.MultiFrameNoAugmentation(size=val_image_size, num_frames=num_frames)
 
-    dataset = MultiFrameIssiaDataset(dataset_path, cameras, transform, only_ball_frames=only_ball_frames,
+    dataset = MultiFrameIssiaDataset(dataset_path, cameras, transform=transform, only_ball_frames=only_ball_frames,
                                    num_frames=num_frames, frame_interval=frame_interval, 
                                    temporal_strategy=temporal_strategy)
     return dataset
