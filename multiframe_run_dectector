@@ -15,7 +15,7 @@ import json
 from collections import deque
 import numpy as np
 
-import network.footandball as footandball
+import network.multiframe_footandball as footandball
 import data.augmentation as augmentations
 from data.multiframe_augmentation import PLAYER_LABEL, BALL_LABEL
 import metric  # Assumes metric.py is in same directory
@@ -129,7 +129,7 @@ if __name__ == '__main__':
     assert os.path.exists(args.weights), 'Weights not found'
     assert os.path.exists(args.path), 'Input video not found'
 
-    model = footandball.model_factory(args.model, 'detect',
+    model = footandball.multiframe_model_factory(args.model, 'detect',
                                       ball_threshold=args.ball_threshold,
                                       player_threshold=args.player_threshold)
 
