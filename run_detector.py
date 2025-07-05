@@ -57,6 +57,11 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
     # Set model to evaluation mode
     model.eval()
 
+    # Read ground truth
+    print('Reading ISSIA ground truth...')
+    gt = read_issia_ground_truth(args.camera_id, args.dataset_path)
+
+
     sequence = cv2.VideoCapture(args.path)
     fps = sequence.get(cv2.CAP_PROP_FPS)
     (frame_width, frame_height) = (int(sequence.get(cv2.CAP_PROP_FRAME_WIDTH)),
