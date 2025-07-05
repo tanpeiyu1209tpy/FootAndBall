@@ -4,7 +4,7 @@
 import random
 import torch
 from torch.utils.data import Sampler, DataLoader, ConcatDataset
-
+from data.issia_utils import make_multiframe_transform
 # Import multi-frame dataset (assuming it's in the same module)
 from data.multiframe_issia_dataset import create_multiframe_issia_dataset, MultiFrameIssiaDataset
 from misc.config import Params
@@ -36,6 +36,7 @@ def make_multiframe_dataloaders(params: Params, num_frames=3, frame_interval=1, 
             num_frames=num_frames,
             frame_interval=frame_interval,
             temporal_strategy=temporal_strategy
+            transform=transform
         )
         
         if len(params.issia_val_cameras) == 0:
