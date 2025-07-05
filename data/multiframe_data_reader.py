@@ -23,7 +23,7 @@ def make_multiframe_dataloaders(params: Params, num_frames=3, frame_interval=1, 
     Returns:
         Dictionary containing train and validation data loaders
     """
-    transform = make_multiframe_transform()
+    transform = make_multiframe_transform(img_size=(720, 1280))
     
     if params.issia_path is None:
         train_issia_dataset = None
