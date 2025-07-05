@@ -206,10 +206,11 @@ def create_multiframe_issia_dataset(dataset_path, cameras, mode, only_ball_frame
     train_image_size = (720, 1280)
     val_image_size = (1080, 1920)
     
-    if mode == 'train':
-        transform = augmentation.MultiFrameTrainAugmentation(size=train_image_size, num_frames=num_frames)
-    elif mode == 'val':
-        transform = augmentation.MultiFrameNoAugmentation(size=val_image_size, num_frames=num_frames)
+    if transform is None:
+        if mode == 'train':
+            transform = augmentation.MultiFrameTrainAugmentation(size=train_image_size, num_frames=num_frames)
+        elif mode == 'val':
+            transform = augmentation.MultiFrameNoAugmentation(size=val_image_size, num_frames=num_frames)
 
     dataset = MultiFrameIssiaDataset(dataset_path, cameras, transform=transform, only_ball_frames=only_ball_frames,
                                    num_frames=num_frames, frame_interval=frame_interval, 
