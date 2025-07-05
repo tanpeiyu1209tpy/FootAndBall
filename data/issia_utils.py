@@ -496,7 +496,7 @@ def extract_frames(dataset_path, camera_id, frames_path):
 
     sequence.release()
     cv2.destroyAllWindows()
-    print(f'Done, number of frames: {count_frames + 1}')
+    #print(f'Done, number of frames: {count_frames + 1}')
 
 if __name__ == '__main__':
     # Example to demonstrate usage of module procedures
