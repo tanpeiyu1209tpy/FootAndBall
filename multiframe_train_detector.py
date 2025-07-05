@@ -24,18 +24,19 @@ MODEL_FOLDER = 'multi_frame_models'
 
 
 def plot_losses(training_stats, model_name):
-    """Plot training losses"""
+    """Plot each loss type with both train and val in the same figure"""
     for loss_key in ['loss', 'loss_ball_c', 'loss_player_c', 'loss_player_l']:
         plt.figure()
-        for phase in training_stats:
-            values = [e[loss_key] for e in training_stats[phase]]
-            plt.plot(values, label=phase)
-        plt.title(loss_key)
+        for phase in ['train', 'val']:
+            if phase in training_stats and len(training_stats[phase]) > 0:
+                values = [epoch[loss_key] for epoch in training_stats[phase]]
+                plt.plot(values, label=phase)
+        plt.title(f'{loss_key} (train vs val)')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.legend()
         plt.grid(True)
-        plt.savefig(f'{model_name}_{loss_key}.png')
+        plt.savefig(f'{model_name}_{loss_key}_train_val.png')
         plt.close()
 
 
@@ -133,6 +134,7 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
 
     # Save model
     model_filepath = os.path.join(MODEL_FOLDER, model_name + '_final' + '.pth')
+    print(f'Saving model to: {model_filepath}')
     torch.save(model.state_dict(), model_filepath)
 
     # Save training statistics
