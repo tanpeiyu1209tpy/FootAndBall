@@ -56,8 +56,9 @@ def plot_eval_history(history, model_name):
 def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, model_name):
     eval_history = []
     best_map = -1.0
-    #best_epoch = None
-    #best_model_path = None
+    best_epoch = None
+    best_model_path = None
+    
     # Weight for components of the loss function.
     # Ball-related loss and player-related loss are mean losses (loss per one positive example)
     alpha_l_player = 0.01
@@ -195,7 +196,8 @@ def train(params: Params):
     optimizer = optim.Adam(model.parameters(), lr=params.lr)
     scheduler_milestones = [int(params.epochs * 0.75)]
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, scheduler_milestones, gamma=0.1)
-    train_model(model, optimizer, scheduler, params.epochs, dataloaders, device, model_name)
+    
+    return train_model(model, optimizer, scheduler, params.epochs, dataloaders, device, model_name)
 
 
 if __name__ == '__main__':
