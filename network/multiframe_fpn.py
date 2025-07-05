@@ -110,7 +110,9 @@ class MultiFrameFPN(nn.Module):
 
     def forward(self, x):
         # Optional temporal fusion step
+        print("[DEBUG] input x shape before fusion:", x.shape)
         if self.temporal_fusion is not None:
+            print("[DEBUG] using temporal_fusion:", self.temporal_fusion)
             x = self.temporal_fusion(x)
         
         # Bottom-up pass, store all intermediary feature maps in list c
