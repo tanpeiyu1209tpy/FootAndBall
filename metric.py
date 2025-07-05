@@ -127,13 +127,5 @@ def getGT(xgtf_path: str) -> t.List[t.Dict[str, torch.Tensor]]:
         ground_truths.append({'boxes': boxes, 'labels': labels})
     return ground_truths, frame_ids[0]
 
-
-def IoU(result, gt):
-    """Compute IoU between two boolean masks"""
-    overlap = result * gt
-    union = result + gt
-    return overlap.sum() / float(union.sum())
-
-
 if __name__ == "__main__":
     print("This module is intended to be imported and used by other scripts.")
