@@ -6,10 +6,10 @@ import torch.nn as nn
 
 import network.multiframe_fpn as fpn
 import network.nms as nms
-from data.augmentation import BALL_LABEL, PLAYER_LABEL, BALL_BBOX_SIZE
+from data.multiframe_augmentation import BALL_LABEL, PLAYER_LABEL, BALL_BBOX_SIZE
 
 # Import multi-frame FPN (assuming it's in the same fpn module)
-from network.fpn import MultiFrameFPN, create_multiframe_fpn
+from network.multiframe_fpn import MultiFrameFPN, create_multiframe_fpn
 
 
 class MultiFrameFootAndBall(nn.Module):
