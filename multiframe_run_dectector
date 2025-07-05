@@ -16,6 +16,7 @@ from collections import deque
 import numpy as np
 
 import network.multiframe_footandball as footandball
+from network.multiframe_footandball import MultiFrameFootAndBall
 import data.augmentation as augmentations
 from data.multiframe_augmentation import PLAYER_LABEL, BALL_LABEL
 import metric  # Assumes metric.py is in same directory
@@ -40,7 +41,7 @@ def draw_bboxes(image, detections):
             cv2.putText(image, '{:0.2f}'.format(score), (max(0, int(x - radius)), max(0, (y - radius - 10))), font, 1, color, 2)
     return image
 
-def run_detector_multiframe(model: footandball.FootAndBall, args: argparse.Namespace, num_frames=3, frame_interval=1):
+def run_detector_multiframe(model: footandball.MultiFrameFootAndBall, args: argparse.Namespace, num_frames=3, frame_interval=1):
     assert num_frames % 2 == 1, "num_frames must be odd (e.g. 3, 5)"
     half_len = num_frames // 2
 
