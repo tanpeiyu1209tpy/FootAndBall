@@ -80,14 +80,14 @@ def eval_model(model, dataloader, device):
         ap = average_precision(pred_cls, gt_cls)
         results[label_name] = ap
         print(f"{label_name}: {ap:.4f}")
-'''
+    '''
     aps = []
     for label_id in [BALL_LABEL, PLAYER_LABEL]:
         pred_cls = [p for img_p in all_pred for p in img_p if p[2] == label_id]
         gt_cls = [g for img_g in all_gt for g in img_g if g[1] == label_id]
         aps.append(average_precision(pred_cls, gt_cls))
     results['mAP'] = np.mean(aps)
-'''
+    '''
     aps = [results['Ball AP'], results['Player AP']]
     results['mAP'] = np.mean(aps)
 
