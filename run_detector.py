@@ -15,7 +15,8 @@ import tqdm
 import network.footandball as footandball
 import data.augmentation as augmentations
 from data.augmentation import PLAYER_LABEL, BALL_LABEL
-
+from data.issia_utils import read_issia_ground_truth
+from evaluate import average_precision
 
 def draw_bboxes(image, detections):
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -64,6 +65,7 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
     out_sequence = cv2.VideoWriter(args.out_video, cv2.VideoWriter_fourcc(*'XVID'), fps,
                                    (frame_width, frame_height))
 
+    '''
     print('Processing video: {}'.format(args.path))
     pbar = tqdm.tqdm(total=n_frames)
     while sequence.isOpened():
@@ -87,6 +89,60 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
     pbar.close()
     sequence.release()
     out_sequence.release()
+    '''
+    print('Processing video: {}'.format(args.path))
+    pbar = tqdm.tqdm(total=n_frames)
+    frame_idx = 0
+
+    while sequence.isOpened():
+        ret, frame = sequence.read()
+        if not ret:
+            break
+
+        img_tensor = augmentations.numpy2tensor(frame).unsqueeze(0).to(args.device)
+
+        with torch.no_grad():
+            detections = model(img_tensor)[0]
+
+        frame = draw_bboxes(frame, detections)
+        out_sequence.write(frame)
+
+        # Collect prediction
+        preds = [(box.cpu().numpy(), score.item(), label.item())
+                 for box, score, label in zip(detections['boxes'], detections['scores'], detections['labels'])]
+        all_pred.append(preds)
+
+        # Collect ground truth
+        gts = []
+        for (x, y) in gt.ball_pos[frame_idx]:
+            r = 12
+            gts.append(([x - r, y - r, x + r, y + r], BALL_LABEL))
+        for (_, h, w, x, y) in gt.persons[frame_idx]:
+            gts.append(([x, y, x + w, y + h], PLAYER_LABEL))
+        all_gt.append(gts)
+
+        frame_idx += 1
+        pbar.update(1)
+
+    pbar.close()
+    sequence.release()
+    out_sequence.release()
+
+    print('\nCalculating AP and mAP...')
+    ball_ap = average_precision(
+        [p for frame in all_pred for p in frame if p[2] == BALL_LABEL],
+        [g for frame in all_gt for g in frame if g[1] == BALL_LABEL]
+    )
+    player_ap = average_precision(
+        [p for frame in all_pred for p in frame if p[2] == PLAYER_LABEL],
+        [g for frame in all_gt for g in frame if g[1] == PLAYER_LABEL]
+    )
+    map_ = (ball_ap + player_ap) / 2
+
+    print(f"Ball AP: {ball_ap:.4f}")
+    print(f"Player AP: {player_ap:.4f}")
+    print(f"mAP: {map_:.4f}")
+
 
 
 if __name__ == '__main__':
@@ -102,6 +158,8 @@ if __name__ == '__main__':
     parser.add_argument('--out_video', help='path to video with detection results', type=str, required=True,
                         default=None)
     parser.add_argument('--device', help='device (CPU or CUDA)', type=str, default='cuda:0')
+    parser.add_argument('--camera_id', type=int, required=True, help='Camera ID (1-6)')
+    parser.add_argument('--dataset_path', type=str, required=True, help='ISSIA dataset root directory')
     args = parser.parse_args()
 
     print('Video path: {}'.format(args.path))
