@@ -3,9 +3,9 @@ from PIL import Image
 import numpy as np
 import os
 
-import data.augmentation as augmentation
+import data.multiframe_augmentation as augmentation
 import data.issia_utils as issia_utils
-from data.augmentation import BALL_BBOX_SIZE, BALL_LABEL, PLAYER_LABEL
+from data.multiframe_augmentation import BALL_BBOX_SIZE, BALL_LABEL, PLAYER_LABEL
 
 from torch.utils.data import Sampler
 
