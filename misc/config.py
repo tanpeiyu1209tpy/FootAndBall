@@ -20,7 +20,7 @@ class Params:
         if self.issia_path is not None:
             temp = params.get('issia_train_cameras', '1, 2, 3, 4')
             self.issia_train_cameras = [int(e) for e in temp.split(',')]
-            temp = params.get('issia_val_cameras', '5, 6')
+            temp = params.get('issia_val_cameras', '5')
             self.issia_val_cameras = [int(e) for e in temp.split(',')]
             
 
