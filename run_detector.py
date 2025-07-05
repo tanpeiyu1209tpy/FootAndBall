@@ -90,6 +90,9 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
     sequence.release()
     out_sequence.release()
     '''
+    all_pred = []
+    all_gt = []
+
     print('Processing video: {}'.format(args.path))
     pbar = tqdm.tqdm(total=n_frames)
     frame_idx = 0
