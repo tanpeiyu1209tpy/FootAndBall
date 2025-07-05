@@ -20,7 +20,7 @@ from data.data_reader import make_dataloaders  # Original for backward compatibi
 from network.ssd_loss import SSDLoss
 from misc.config import Params
 
-MODEL_FOLDER = 'models'
+MODEL_FOLDER = 'multi_frame_models'
 
 
 def plot_losses(training_stats, model_name):
