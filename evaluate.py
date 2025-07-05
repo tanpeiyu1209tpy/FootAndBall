@@ -35,7 +35,7 @@ def compute_ap_map(detections, ground_truths, iou_threshold=0.5):
     for class_id in [BALL_LABEL, PLAYER_LABEL]:  # [1, 2]
         y_true = []
         y_scores = []
-        '''
+        
         for det, gt in zip(detections, ground_truths):
             det_boxes = [b for b, l in zip(det["boxes"], det["labels"]) if l == class_id]
             det_scores = [s for s, l in zip(det["scores"], det["labels"]) if l == class_id]
@@ -71,56 +71,7 @@ def compute_ap_map(detections, ground_truths, iou_threshold=0.5):
 
     aps['mAP'] = np.mean(list(aps.values()))
     return aps
-    '''
-    for frame_idx, (det, gt) in enumerate(zip(detections, ground_truths)):
-            det_boxes = [b for b, l in zip(det["boxes"], det["labels"]) if l == class_id]
-            det_scores = [s for s, l in zip(det["scores"], det["labels"]) if l == class_id]
-            gt_boxes = [b for b, l in zip(gt["boxes"], gt["labels"]) if l == class_id]
-            matched = [False] * len(gt_boxes)
 
-            if verbose:
-                print(f"\n[Class {class_id}] Frame {frame_idx}:")
-                print(f"  GT boxes: {len(gt_boxes)}")
-                print(f"  Detected boxes: {len(det_boxes)}")
-
-            for box, score in zip(det_boxes, det_scores):
-                iou_max = 0.0
-                matched_idx = -1
-                for i, gt_box in enumerate(gt_boxes):
-                    iou = IoU_box(box, gt_box)
-                    if iou > iou_max:
-                        iou_max = iou
-                        matched_idx = i
-
-                if iou_max >= iou_threshold and matched_idx != -1 and not matched[matched_idx]:
-                    y_true.append(1)
-                    matched[matched_idx] = True
-                    match_status = "TP"
-                else:
-                    y_true.append(0)
-                    match_status = "FP"
-
-                y_scores.append(score)
-                if verbose:
-                    print(f"  Pred box {box} (score={score:.2f}) -> IoU max = {iou_max:.2f} => {match_status}")
-
-            for m in matched:
-                if not m:
-                    y_true.append(1)
-                    y_scores.append(0)
-                    if verbose:
-                        print("  FN: Missed a GT box")
-
-        if len(y_true) == 0 or len(set(y_true)) == 1:
-            aps[class_id] = 0.0
-        else:
-            aps[class_id] = average_precision_score(
-                y_true,
-                [s.cpu().item() if torch.is_tensor(s) else s for s in y_scores]
-            )
-
-    aps['mAP'] = np.mean(list(aps.values()))
-    return aps
 
 def getGT(xgtf_path: str) -> t.List[t.Dict[str, torch.Tensor]]:
     """
