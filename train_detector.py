@@ -85,6 +85,7 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
+                torch.cuda.empty_cache()
 
                 count_batches += 1
                 batch_stats['loss'].append(loss.item())
