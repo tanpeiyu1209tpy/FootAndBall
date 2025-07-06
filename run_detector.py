@@ -295,7 +295,7 @@ if __name__ == '__main__':
     parser.add_argument('--temporal', action='store_true', help='Enable temporal fusion')
     parser.add_argument('--temporal-window', type=int, default=3, help='Number of frames in temporal window')
     parser.add_argument('--fusion-method', type=str, default='difference',
-                        choices=['difference', 'variance', 'weighted_avg'], help='Fusion method type')
+                        choices=['difference', 'variance', 'weighted_avg', 'attention'], help='Fusion method type')
 
     args = parser.parse_args()
 
