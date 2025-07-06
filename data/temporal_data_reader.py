@@ -1,10 +1,8 @@
 import random
 import torch
 from torch.utils.data import Sampler, DataLoader, ConcatDataset
-
-from data.issia_dataset import create_issia_dataset, IssiaDataset
 from misc.config import Params
-from data.temporal_issia_dataset import TemporalIssiaDataset
+from data.temporal_issia_dataset import TemporalIssiaDataset, create_temporal_issia_dataset
 
 def make_temporal_dataloaders(params, temporal_frames=3):
     """
