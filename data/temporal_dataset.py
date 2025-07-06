@@ -39,6 +39,11 @@ class TemporalDatasetWrapper:
             
             temporal_images = torch.stack(temporal_images, dim=0)  # [T, 3, H, W]
             return temporal_images, boxes, labels
+#################
+             elif self.mode == 'consecutive':
+                # TODO: 实现真正的连续帧读取
+                # 这需要更复杂的逻辑来处理sequence boundaries
+                raise NotImplementedError("Consecutive frame mode not implemented yet")
         
         else:
             raise ValueError(f"Unknown mode: {self.mode}")
