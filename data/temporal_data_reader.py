@@ -1,3 +1,10 @@
+import random
+import torch
+from torch.utils.data import Sampler, DataLoader, ConcatDataset
+
+from data.issia_dataset import create_issia_dataset, IssiaDataset
+from misc.config import Params
+
 def make_temporal_dataloaders(params, temporal_frames=3):
     """
     MODIFICATION: Create dataloaders for temporal dataset
@@ -33,6 +40,11 @@ def make_temporal_dataloaders(params, temporal_frames=3):
 
     return dataloaders
 
+def my_collate(batch):
+    images = torch.stack([e[0] for e in batch], dim=0)
+    boxes = [e[1] for e in batch]
+    labels = [e[2] for e in batch]
+    return images, boxes, labels
 
 class TemporalBalancedSampler(Sampler):
     """
