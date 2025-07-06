@@ -3,13 +3,13 @@ from data.issia_dataset import IssiaDataset
 
 
 class TemporalDatasetWrapper:
-    """将原始dataset包装成temporal dataset"""
+    # Wrap the original dataset into a temporal dataset
     def __init__(self, original_dataset, temporal_window=3, mode='repeat'):
         """
         Args:
-            original_dataset: 原始的IssiaDataset
-            temporal_window: 时间窗口大小
-            mode: 'repeat' - 重复当前帧, 'consecutive' - 连续帧 (待实现)
+            original_dataset: original IssiaDataset
+            temporal_window: temporal window size
+            mode: repeat current frame
         """
         self.dataset = original_dataset
         self.temporal_window = temporal_window
@@ -21,29 +21,24 @@ class TemporalDatasetWrapper:
         
     def __getitem__(self, idx):
         if self.mode == 'repeat':
-            # 简单策略：重复当前帧T次 (用于快速验证fusion效果)
+            # Simple strategy: repeat the current frame T times (for quick verification of fusion effect)
             image, boxes, labels = self.dataset[idx]
             
-            # 重复帧，添加微小的噪声模拟slight variations
+            # Repeat the frame and add a little noise to simulate slight variations
             temporal_images = []
             for t in range(self.temporal_window):
                 if t == 0:
-                    # 第一帧保持原样
+                    # The first frame remains as is
                     temporal_images.append(image)
                 else:
-                    # 添加微小随机噪声 (标准差=0.01)
+                    # Add tiny random noise (standard deviation = 0.01)
                     noise = torch.randn_like(image) * 0.01
                     noisy_image = image + noise
-                    noisy_image = torch.clamp(noisy_image, 0, 1)  # 确保在[0,1]范围内
+                    noisy_image = torch.clamp(noisy_image, 0, 1)  # make sure range between [0,1]
                     temporal_images.append(noisy_image)
             
             temporal_images = torch.stack(temporal_images, dim=0)  # [T, 3, H, W]
             return temporal_images, boxes, labels
-            
-        elif self.mode == 'consecutive':
-            # TODO: 实现真正的连续帧读取
-            # 这需要更复杂的逻辑来处理sequence boundaries
-            raise NotImplementedError("Consecutive frame mode not implemented yet")
         
         else:
             raise ValueError(f"Unknown mode: {self.mode}")
