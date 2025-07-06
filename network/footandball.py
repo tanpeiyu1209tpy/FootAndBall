@@ -5,7 +5,7 @@ import network.fpn as fpn
 import network.nms as nms
 from data.augmentation import BALL_LABEL, PLAYER_LABEL, BALL_BBOX_SIZE
 
-
+'''
 class TemporalFusion(nn.Module):
     """简单的temporal fusion模块"""
     def __init__(self, channels=32, method='difference'):
@@ -58,7 +58,72 @@ class TemporalFusion(nn.Module):
             fused = torch.mean(features, dim=1)
             
         return fused  # [B, C, H, W]
+'''
+class TemporalFusion(nn.Module):
+    def __init__(self, channels=32, method='difference'):
+        super().__init__()
+        self.method = method
+        self.channels = channels
 
+        if self.method == 'attention':
+            # 简化的 attention 融合
+            self.query = nn.Linear(channels, channels)
+            self.key = nn.Linear(channels, channels)
+            self.value = nn.Linear(channels, channels)
+            self.softmax = nn.Softmax(dim=-1)
+
+    def forward(self, features, batch_size, temporal_window):
+        """
+        features: [B*T, C, H, W]
+        Returns: [B, C, H, W]
+        """
+        if temporal_window == 1:
+            return features.view(batch_size, *features.shape[1:])
+
+        BT, C, H, W = features.shape
+        features = features.view(batch_size, temporal_window, C, H, W)
+
+        if self.method == 'difference':
+            diff_maps = []
+            for i in range(1, temporal_window):
+                diff = torch.abs(features[:, i] - features[:, i-1])
+                diff_maps.append(diff)
+            if len(diff_maps) == 0:
+                fused = features[:, 0]
+            else:
+                diff_avg = torch.mean(torch.stack(diff_maps, dim=1), dim=1)
+                current_frame = features[:, -1]
+                fused = 0.7 * diff_avg + 0.3 * current_frame
+
+        elif self.method == 'variance':
+            fused = torch.var(features, dim=1)
+
+        elif self.method == 'weighted_avg':
+            weights = torch.linspace(0.5, 1.0, temporal_window).to(features.device)
+            weights = weights.view(1, temporal_window, 1, 1, 1)
+            weighted_features = features * weights
+            fused = torch.mean(weighted_features, dim=1)
+
+        elif self.method == 'attention':
+            # reshape to [B, T, C, H*W]
+            features_flat = features.view(batch_size, temporal_window, C, -1)  # [B, T, C, HW]
+            features_flat = features_flat.permute(0, 3, 1, 2)  # [B, HW, T, C]
+
+            Q = self.query(features_flat)  # [B, HW, T, C]
+            K = self.key(features_flat)
+            V = self.value(features_flat)
+
+            attention_scores = torch.matmul(Q, K.transpose(-1, -2)) / (self.channels ** 0.5)  # [B, HW, T, T]
+            attention_weights = self.softmax(attention_scores)  # [B, HW, T, T]
+            attended = torch.matmul(attention_weights, V)  # [B, HW, T, C]
+            attended = attended.sum(dim=2)  # [B, HW, C]
+
+            fused = attended.permute(0, 2, 1).view(batch_size, C, H, W)  # [B, C, H, W]
+
+        else:
+            fused = torch.mean(features, dim=1)
+
+        return fused
 
 # 保持原有的辅助函数不变...
 def get_active_cells(bbox_center_x, bbox_center_y, downsampling_factor, conf_width, conf_height, delta):
