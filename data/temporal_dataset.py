@@ -14,7 +14,7 @@ class TemporalDatasetWrapper:
         self.dataset = original_dataset
         self.temporal_window = temporal_window
         self.mode = mode
-        print(f"🎬 Temporal dataset wrapper: {mode} mode, window={temporal_window}")
+        print(f"Temporal dataset wrapper: {mode} mode, window={temporal_window}")
         
     def __len__(self):
         return len(self.dataset)
