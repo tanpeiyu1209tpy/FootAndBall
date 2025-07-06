@@ -7,6 +7,6 @@ issia_val_cameras=5
 epochs=3 
 lr=1e-3
 batch_size=16 
-num_workers=8
+num_workers=4
 #20,1e-3,12,8
 
