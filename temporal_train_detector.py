@@ -156,7 +156,7 @@ def train(params: Params, override_model=None):
         
         # Create temporal model
         device = "cuda" if torch.cuda.is_available() else 'cpu'
-        model = footandball.model_factory(
+        model = temporal_footandball.model_factory(
             model_name, 'train', 
             temporal_frames=temporal_frames,
             use_motion_module=use_motion_module
