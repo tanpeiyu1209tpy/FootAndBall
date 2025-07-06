@@ -17,7 +17,7 @@ import torch
 import torch.optim as optim
 import matplotlib.pyplot as plt
 
-from network import footandball
+from network import temporal_footandball
 from data.temporal_data_reader import make_temporal_dataloaders
 from network.ssd_loss import SSDLoss
 from misc.config import Params
