@@ -10,7 +10,3 @@ batch_size=16
 num_workers=8
 #20,1e-3,12,8
 
-#model=fb1
-
-temporal_frames=3
-use_motion_module=True
