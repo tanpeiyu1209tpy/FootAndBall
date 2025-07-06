@@ -28,7 +28,6 @@ def clear_memory():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-
 def draw_bboxes(image, detections):
     font = cv2.FONT_HERSHEY_SIMPLEX
     for box, label, score in zip(detections['boxes'], detections['labels'], detections['scores']):
@@ -36,23 +35,20 @@ def draw_bboxes(image, detections):
             x1, y1, x2, y2 = box
             color = (255, 0, 0)
             cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
-            cv2.putText(image, '{:0.2f}'.format(score), (int(x1), max(0, int(y1) - 10)), font, 1, color, 2)
+            cv2.putText(image, '{:0.2f}'.format(score), (int(x1), max(0, int(y1)-10)), font, 1, color, 2)
 
         elif label == BALL_LABEL:
             x1, y1, x2, y2 = box
             x = int((x1 + x2) / 2)
             y = int((y1 + y2) / 2)
             color = (0, 0, 255)
-            
-            bbox_width = x2 - x1
-            bbox_height = y2 - y1
-            radius = max(5, min(25, int(min(bbox_width, bbox_height) / 2)))
-            
+            radius = 25
             cv2.circle(image, (int(x), int(y)), radius, color, 2)
-            cv2.putText(image, '{:0.2f}'.format(score), (max(0, int(x - radius)), max(0, y - radius - 10)), font, 1, color, 2)
+            cv2.putText(image, '{:0.2f}'.format(score), (max(0, int(x - radius)), max(0, (y - radius - 10))), font, 1,
+                        color, 2)
+
     return image
-
-
+    
 def estimate_memory_usage(frame_width, frame_height, temporal_window, batch_size=1):
 
     # 单帧内存使用 (3 channels * height * width * 4 bytes for float32)
