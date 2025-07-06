@@ -43,7 +43,6 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
     fps = sequence.get(cv2.CAP_PROP_FPS)
     frame_width = int(sequence.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(sequence.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    resize_width, resize_height = 640, 360
     n_frames = int(sequence.get(cv2.CAP_PROP_FRAME_COUNT))
     out_sequence = cv2.VideoWriter(args.out_video, cv2.VideoWriter_fourcc(*'mp4v'), fps, (frame_width, frame_height))
 
@@ -52,23 +51,15 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
 
     frame_buffer = []
     all_detections = []
-    scale_x = frame_width / resize_width
-    scale_y = frame_height / resize_height
 
     while sequence.isOpened():
         ret, frame = sequence.read()
         if not ret:
             break
-        '''
-        frame = cv2.resize(frame, (resize_width, resize_height))
 
         img_tensor = augmentations.numpy2tensor(frame)
         frame_buffer.append(img_tensor)
-        '''
-        resized_frame = cv2.resize(frame, (resize_width, resize_height))
-        img_tensor = augmentations.numpy2tensor(resized_frame)
-        frame_buffer.append(img_tensor)
-        
+
         if args.temporal:
             if len(frame_buffer) < args.temporal_window:
                 pbar.update(1)
@@ -87,15 +78,6 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
             for box, score, label in zip(detections["boxes"], detections["scores"], detections["labels"]):
                 if (label == BALL_LABEL and score >= args.ball_threshold) or \
                    (label == PLAYER_LABEL and score >= args.player_threshold):
-                    x1, y1, x2, y2 = box.tolist()
-
-                    # ✅ 把预测框从 resized 尺寸放大回原始尺寸
-                    x1 *= scale_x
-                    x2 *= scale_x
-                    y1 *= scale_y
-                    y2 *= scale_y
-                    box = torch.tensor([x1, y1, x2, y2])
-                
                     filtered_boxes.append(box)
                     filtered_scores.append(score)
                     filtered_labels.append(label)
@@ -110,13 +92,8 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
                 "labels": [l.item() for l in detections["labels"]],
             })
 
-        resized_drawn = draw_bboxes(resized_frame.copy(), detections)
-
-        # ✅ Step 2: upscale to original size (1920x1080)
-        frame_upscaled = cv2.resize(resized_drawn, (frame_width, frame_height))
-        
-        # ✅ Step 3: write video
-        out_sequence.write(frame_upscaled)
+        frame = draw_bboxes(frame, detections)
+        out_sequence.write(frame)
         pbar.update(1)
 
     pbar.close()
