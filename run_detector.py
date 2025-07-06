@@ -32,7 +32,6 @@ def draw_bboxes(image, detections):
 
 
 def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
-
     resize_width, resize_height = 640, 360
 
     model.print_summary(show_architecture=False)
@@ -52,8 +51,6 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
     print('Processing video: {}'.format(args.path))
     pbar = tqdm.tqdm(total=n_frames)
 
-    scale_x = frame_width / resize_width
-    scale_y = frame_height / resize_height
     frame_buffer = []
     all_detections = []
 
@@ -62,23 +59,28 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
         if not ret:
             break
 
-
+        # Resize for model input
         resized_frame = cv2.resize(frame, (resize_width, resize_height))
         img_tensor = augmentations.numpy2tensor(resized_frame)
         frame_buffer.append(img_tensor)
 
+        # Maintain temporal window
         if args.temporal:
             if len(frame_buffer) < args.temporal_window:
                 pbar.update(1)
                 continue
             elif len(frame_buffer) > args.temporal_window:
                 frame_buffer.pop(0)
-            input_tensor = torch.stack(frame_buffer).unsqueeze(0).to(args.device)
+            input_tensor = torch.stack(frame_buffer).unsqueeze(0).to(args.device)  # [1, T, 3, H, W]
         else:
-            input_tensor = img_tensor.unsqueeze(0).to(args.device)
+            input_tensor = img_tensor.unsqueeze(0).to(args.device)  # [1, 3, H, W]
 
         with torch.no_grad():
             detections = model(input_tensor)[0]
+
+        # === Compute scale per frame ===
+        scale_x = frame.shape[1] / resize_width
+        scale_y = frame.shape[0] / resize_height
 
         filtered_boxes, filtered_scores, filtered_labels = [], [], []
         for box, score, label in zip(detections["boxes"], detections["scores"], detections["labels"]):
@@ -86,8 +88,8 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
                (label == PLAYER_LABEL and score >= args.player_threshold):
                 x1, y1, x2, y2 = box.tolist()
                 x1 *= scale_x
-                y1 *= scale_y
                 x2 *= scale_x
+                y1 *= scale_y
                 y2 *= scale_y
                 box = torch.tensor([x1, y1, x2, y2])
                 filtered_boxes.append(box)
@@ -104,6 +106,7 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
             "labels": [l.item() for l in filtered_labels],
         })
 
+        # Draw on original resolution
         frame = draw_bboxes(frame, detections)
         out_sequence.write(frame)
         pbar.update(1)
@@ -112,6 +115,7 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
     sequence.release()
     out_sequence.release()
     return all_detections
+
 
 
 if __name__ == '__main__':
