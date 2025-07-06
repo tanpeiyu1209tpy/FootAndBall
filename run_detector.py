@@ -14,7 +14,7 @@ import evaluate
 
 
 def get_memory_usage():
-    """获取当前GPU内存使用情况"""
+
     if torch.cuda.is_available():
         allocated = torch.cuda.memory_allocated() / 1024**3
         cached = torch.cuda.memory_reserved() / 1024**3
@@ -23,7 +23,7 @@ def get_memory_usage():
 
 
 def clear_memory():
-    """清理内存"""
+
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -54,33 +54,33 @@ def draw_bboxes(image, detections):
 
 
 def estimate_memory_usage(frame_width, frame_height, temporal_window, batch_size=1):
-    """估算内存使用量"""
+
     # 单帧内存使用 (3 channels * height * width * 4 bytes for float32)
     single_frame_mb = (3 * frame_height * frame_width * 4) / (1024 * 1024)
     
-    # 时间窗口内存
+
     temporal_mb = single_frame_mb * temporal_window * batch_size
     
-    # 模型参数和梯度（估算）
-    model_mb = 200  # 大概估算
+
+    model_mb = 200  
     
     total_mb = temporal_mb + model_mb
     return total_mb
 
 
 def adaptive_resize_for_memory(frame_width, frame_height, max_memory_mb=4000):
-    """根据内存限制自适应调整分辨率"""
+
     current_mb = estimate_memory_usage(frame_width, frame_height, 1)
     
     if current_mb <= max_memory_mb:
         return frame_width, frame_height, 1.0
     
-    # 计算需要的缩放比例
+    
     scale = (max_memory_mb / current_mb) ** 0.5
     new_width = int(frame_width * scale)
     new_height = int(frame_height * scale)
     
-    # 确保是偶数（某些编码器要求）
+
     new_width = (new_width // 2) * 2
     new_height = (new_height // 2) * 2
     
@@ -88,6 +88,11 @@ def adaptive_resize_for_memory(frame_width, frame_height, max_memory_mb=4000):
 
 
 def run_detector_memory_efficient(model: footandball.FootAndBall, args: argparse.Namespace):
+
+    model.eval()
+    for param in model.parameters():
+        param.requires_grad = False
+    
     model.print_summary(show_architecture=False)
     model = model.to(args.device)
 
@@ -111,7 +116,7 @@ def run_detector_memory_efficient(model: footandball.FootAndBall, args: argparse
     
     print(f"Original video: {orig_width}x{orig_height}, {n_frames} frames")
     
-    # 根据内存限制调整分辨率
+  
     if args.auto_resize:
         proc_width, proc_height, scale = adaptive_resize_for_memory(
             orig_width, orig_height, args.max_memory_mb
@@ -123,7 +128,7 @@ def run_detector_memory_efficient(model: footandball.FootAndBall, args: argparse
         scale = 1.0
         need_resize = False
     
-    # 估算内存使用
+    
     estimated_mb = estimate_memory_usage(proc_width, proc_height, args.temporal_window)
     print(f"Estimated memory usage: {estimated_mb:.1f} MB")
     
@@ -137,7 +142,7 @@ def run_detector_memory_efficient(model: footandball.FootAndBall, args: argparse
     all_detections = []
     frame_count = 0
     
-    # 内存监控
+    
     initial_alloc, initial_cached = get_memory_usage()
     print(f"Initial GPU memory: {initial_alloc:.2f}GB allocated, {initial_cached:.2f}GB cached")
 
@@ -147,9 +152,9 @@ def run_detector_memory_efficient(model: footandball.FootAndBall, args: argparse
             if not ret:
                 break
 
-            # 处理帧
+        
             if need_resize:
-                # resize到处理分辨率
+              
                 processed_frame = cv2.resize(frame, (proc_width, proc_height))
             else:
                 processed_frame = frame
@@ -157,7 +162,7 @@ def run_detector_memory_efficient(model: footandball.FootAndBall, args: argparse
             img_tensor = augmentations.numpy2tensor(processed_frame)
             frame_buffer.append(img_tensor)
 
-            # 时间窗口处理
+          
             if args.temporal:
                 if len(frame_buffer) < args.temporal_window:
                     padded_buffer = list(frame_buffer)
@@ -189,14 +194,14 @@ def run_detector_memory_efficient(model: footandball.FootAndBall, args: argparse
                             
                             x1, y1, x2, y2 = box_coords
                             
-                            # 如果resize了，需要缩放坐标回原始分辨率
+                      
                             if need_resize:
                                 x1 = x1 / scale
                                 x2 = x2 / scale
                                 y1 = y1 / scale
                                 y2 = y2 / scale
                             
-                            # 确保坐标在合理范围内
+                      
                             x1 = max(0, min(x1, orig_width))
                             x2 = max(0, min(x2, orig_width))
                             y1 = max(0, min(y1, orig_height))
@@ -207,7 +212,7 @@ def run_detector_memory_efficient(model: footandball.FootAndBall, args: argparse
                                 filtered_scores.append(score_val)
                                 filtered_labels.append(label_val)
 
-                # 清理GPU内存
+   
                 del input_tensor
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
@@ -222,21 +227,21 @@ def run_detector_memory_efficient(model: footandball.FootAndBall, args: argparse
                     "labels": filtered_labels,
                 })
 
-            # 在原始分辨率上绘制
+
             frame = draw_bboxes(frame, detections)
             out_sequence.write(frame)
             
             frame_count += 1
             pbar.update(1)
             
-            # 定期内存清理和监控
+  
             if frame_count % args.memory_check_interval == 0:
                 clear_memory()
                 alloc, cached = get_memory_usage()
                 if frame_count % (args.memory_check_interval * 10) == 0:  # 每1000帧打印一次
                     print(f"\nFrame {frame_count}: {alloc:.2f}GB allocated, {cached:.2f}GB cached")
                 
-                # 内存使用过高时的处理
+    
                 if alloc > args.max_gpu_memory_gb:
                     print(f"Warning: GPU memory usage ({alloc:.2f}GB) exceeds limit ({args.max_gpu_memory_gb}GB)")
                     clear_memory()
@@ -266,6 +271,21 @@ def run_detector_memory_efficient(model: footandball.FootAndBall, args: argparse
 
 
 if __name__ == '__main__':
+    import random
+    import numpy as np
+    
+    random.seed(42)
+    np.random.seed(42)
+    torch.manual_seed(42)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(42)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        try:
+            torch.use_deterministic_algorithms(True)
+        except:
+            pass
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', type=str, required=True, help='Path to input video')
     parser.add_argument('--model', type=str, default='fb1', help='Model name')
@@ -282,13 +302,11 @@ if __name__ == '__main__':
     parser.add_argument('--fusion-method', type=str, default='difference',
                         choices=['difference', 'variance', 'weighted_avg', 'attention'], help='Fusion method type')
     
-    # 内存优化参数
     parser.add_argument('--auto-resize', action='store_true', help='Automatically resize based on memory limit')
     parser.add_argument('--max-memory-mb', type=int, default=4000, help='Maximum memory usage in MB')
     parser.add_argument('--max-gpu-memory-gb', type=float, default=8.0, help='Maximum GPU memory in GB')
     parser.add_argument('--memory-check-interval', type=int, default=100, help='Memory check interval (frames)')
     
-    # 批处理参数
     parser.add_argument('--batch-process', action='store_true', help='Process video in batches')
     parser.add_argument('--batch-size', type=int, default=1000, help='Batch size in frames')
 
@@ -341,6 +359,24 @@ if __name__ == '__main__':
         exit(1)
 
     print(f"Successfully processed {len(all_detections)} frames")
+
+    debug_info = {
+        "total_frames": len(all_detections),
+        "ball_detections": sum(d.get('labels', []).count(BALL_LABEL) for d in all_detections),
+        "player_detections": sum(d.get('labels', []).count(PLAYER_LABEL) for d in all_detections),
+        "frames_with_ball": sum(1 for d in all_detections if BALL_LABEL in d.get('labels', [])),
+        "frames_with_players": sum(1 for d in all_detections if PLAYER_LABEL in d.get('labels', [])),
+        "settings": {
+            "auto_resize": args.auto_resize,
+            "max_memory_mb": args.max_memory_mb,
+            "temporal": args.temporal,
+            "ball_threshold": args.ball_threshold,
+            "player_threshold": args.player_threshold
+        }
+    }
+    
+    with open("detection_debug.json", "w") as f:
+        json.dump(debug_info, f, indent=2)
 
     # === Evaluation ===
     if args.metric_path:
