@@ -118,10 +118,10 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
 def train(params: Params, model_name='fb1', use_temporal_fusion=False, temporal_window=3, fusion_method='difference'):
     """
     Args:
-        model_name: 模型名称 (从命令行传入)
-        use_temporal_fusion: 是否使用temporal fusion
-        temporal_window: 时间窗口大小  
-        fusion_method: fusion方法
+        model_name: model name
+        use_temporal_fusion: use temporal fusion or not
+        temporal_window: temporal window size
+        fusion_method: fusion ways
     """
     if not os.path.exists(MODEL_FOLDER):
         os.mkdir(MODEL_FOLDER)
@@ -134,16 +134,15 @@ def train(params: Params, model_name='fb1', use_temporal_fusion=False, temporal_
     if 'val' in dataloaders:
         print('Validation set: Dataset size: {}'.format(len(dataloaders['val'].dataset)))
 
-    # 使用命令行传入的model_name
+    # Use the model_name passed in from the command line
     device = "cuda" if torch.cuda.is_available() else 'cpu'
-    model = footandball.model_factory(model_name, 'train',  # ←使用传入的model_name
+    model = footandball.model_factory(model_name, 'train', 
                                       use_temporal_fusion=use_temporal_fusion,
                                       temporal_window=temporal_window,
                                       fusion_method=fusion_method)
     model.print_summary(show_architecture=True)
     model = model.to(device)
 
-    # Model name包含所有关键信息
     suffix = f"_temporal_{fusion_method}_w{temporal_window}" if use_temporal_fusion else ""
     model_name = f'model_{model_name}_' + time.strftime("%Y%m%d_%H%M") + suffix
     print('Model name: {}'.format(model_name))
@@ -161,10 +160,8 @@ if __name__ == '__main__':
     parser.add_argument('--config', help='Path to the configuration file', type=str, default='config.txt')
     parser.add_argument('--debug', dest='debug', help='debug mode', action='store_true')
     
-    # Model参数
     parser.add_argument('--model', help='model name', type=str, default='fb1')
-    
-    # Temporal fusion参数
+
     parser.add_argument('--temporal', dest='use_temporal', help='use temporal fusion', action='store_true')
     parser.add_argument('--temporal-window', help='temporal window size', type=int, default=3)
     parser.add_argument('--fusion-method', help='fusion method', type=str, default='difference',
@@ -183,6 +180,5 @@ if __name__ == '__main__':
     params = Params(args.config)
     params.print()
 
-    # 传递所有命令行参数
     train(params, model_name=args.model, use_temporal_fusion=args.use_temporal, 
           temporal_window=args.temporal_window, fusion_method=args.fusion_method)
