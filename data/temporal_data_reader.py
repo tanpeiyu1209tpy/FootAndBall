@@ -4,6 +4,7 @@ from torch.utils.data import Sampler, DataLoader, ConcatDataset
 
 from data.issia_dataset import create_issia_dataset, IssiaDataset
 from misc.config import Params
+from data.temporal_issia_dataset import TemporalIssiaDataset
 
 def make_temporal_dataloaders(params, temporal_frames=3):
     """
@@ -75,3 +76,7 @@ class TemporalBalancedSampler(Sampler):
 
     def __len(self):
         return len(self.sample_ndx)
+
+def collate_fn(batch):
+    images, targets = zip(*batch)
+    return torch.stack(images, 0), targets
