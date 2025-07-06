@@ -33,99 +33,66 @@ def compute_ap_map(detections, ground_truths, iou_threshold=0.5):
     """
     aps = {}
     
+    # Debug information
+    total_frames = len(detections)
+    frames_with_gt = sum(1 for gt in ground_truths if len(gt['boxes']) > 0)
+    print(f"\n[Debug] Total frames: {total_frames}, Frames with GT: {frames_with_gt}")
+    
     for class_id in [BALL_LABEL, PLAYER_LABEL]:  # [1, 2]
-        # 收集所有检测结果和对应的GT匹配信息
-        all_detections = []
-        total_gt_count = 0
+        y_true = []
+        y_scores = []
         
-        for frame_idx, (det, gt) in enumerate(zip(detections, ground_truths)):
+        class_name = "Ball" if class_id == BALL_LABEL else "Player"
+        frames_evaluated = 0
+        
+        for det, gt in zip(detections, ground_truths):
+            # Skip frames that have no ground truth annotations at all
+            if len(gt['boxes']) == 0:
+                continue
+                
+            frames_evaluated += 1
+                
             det_boxes = [b for b, l in zip(det["boxes"], det["labels"]) if l == class_id]
             det_scores = [s for s, l in zip(det["scores"], det["labels"]) if l == class_id]
             gt_boxes = [b for b, l in zip(gt["boxes"], gt["labels"]) if l == class_id]
             
-            total_gt_count += len(gt_boxes)
-            
-            # 为每个检测结果找到最佳匹配的GT
+            matched = [False] * len(gt_boxes)
+
             for box, score in zip(det_boxes, det_scores):
-                score_val = score.cpu().item() if torch.is_tensor(score) else score
-                
-                best_iou = 0.0
-                best_gt_idx = -1
-                
-                for gt_idx, gt_box in enumerate(gt_boxes):
+                iou_max = 0.0
+                matched_idx = -1
+                for i, gt_box in enumerate(gt_boxes):
                     iou = IoU_box(box, gt_box)
-                    if iou > best_iou:
-                        best_iou = iou
-                        best_gt_idx = gt_idx
-                
-                all_detections.append({
-                    'score': score_val,
-                    'iou': best_iou,
-                    'frame_idx': frame_idx,
-                    'gt_idx': best_gt_idx
-                })
-        
-        if total_gt_count == 0:
-            aps[class_id] = 0.0
-            print(f"Class {class_id}: No ground truth found")
-            continue
-        
-        if len(all_detections) == 0:
-            aps[class_id] = 0.0
-            print(f"Class {class_id}: No detections found")
-            continue
-            
-        # 按置信度降序排列
-        all_detections.sort(key=lambda x: x['score'], reverse=True)
-        
-        # 跟踪已匹配的GT
-        matched_gt = set()
-        
-        # 计算TP/FP
-        tp_fp_labels = []
-        scores = []
-        
-        for det in all_detections:
-            scores.append(det['score'])
-            
-            if det['iou'] >= iou_threshold and det['gt_idx'] != -1:
-                gt_key = (det['frame_idx'], det['gt_idx'])
-                if gt_key not in matched_gt:
-                    # True Positive
-                    tp_fp_labels.append(1)
-                    matched_gt.add(gt_key)
+                    if iou > iou_max:
+                        iou_max = iou
+                        matched_idx = i
+                if iou_max >= iou_threshold and not matched[matched_idx]:
+                    y_true.append(1)
+                    matched[matched_idx] = True
                 else:
-                    # False Positive (GT already matched)
-                    tp_fp_labels.append(0)
-            else:
-                # False Positive (IoU too low or no GT)
-                tp_fp_labels.append(0)
+                    y_true.append(0)
+                y_scores.append(score)
+
+            for m in matched:
+                if not m:
+                    y_true.append(1)
+                    y_scores.append(0)
         
-        # 计算AP
-        if len(tp_fp_labels) == 0 or sum(tp_fp_labels) == 0:
+        print(f"[Debug] {class_name} - Evaluated {frames_evaluated} frames, {len(y_true)} predictions")
+
+        if len(y_true) == 0 or len(set(y_true)) == 1:
             aps[class_id] = 0.0
         else:
-            aps[class_id] = average_precision_score(tp_fp_labels, scores)
-        
-        # 打印调试信息
-        tp_count = sum(tp_fp_labels)
-        fp_count = len(tp_fp_labels) - tp_count
-        recall = tp_count / total_gt_count if total_gt_count > 0 else 0
-        precision = tp_count / (tp_count + fp_count) if (tp_count + fp_count) > 0 else 0
-        
-        print(f"Class {class_id}: Detections={len(all_detections)}, GT={total_gt_count}")
-        print(f"  TP={tp_count}, FP={fp_count}, Precision={precision:.4f}, Recall={recall:.4f}")
-        print(f"  AP@{iou_threshold}={aps[class_id]:.4f}")
+            aps[class_id] = average_precision_score(y_true, [s.cpu().item() if torch.is_tensor(s) else s for s in y_scores])
 
     aps['mAP'] = np.mean(list(aps.values()))
     return aps
 
 
-def getGT(xgtf_path: str) -> t.Tuple[t.List[t.Dict[str, torch.Tensor]], t.List[int]]:
+def getGT(xgtf_path: str) -> t.Tuple[t.List[t.Dict[str, torch.Tensor]], int]:
     """
-    Parses the .xgtf ground truth file and returns:
-    - List of frame-wise dicts with 'boxes' and 'labels'
-    - List of frame indices that have annotations
+    Parses the .xgtf ground truth file and returns a list of frame-wise dicts.
+    Each dict contains 'boxes': Tensor[N,4], 'labels': Tensor[N]
     """
     tree = ET.parse(xgtf_path)
     root = tree.getroot()
@@ -167,40 +134,27 @@ def getGT(xgtf_path: str) -> t.Tuple[t.List[t.Dict[str, torch.Tensor]], t.List[i
                     gt_by_frame[frame_id]['boxes'].append(box)
                     gt_by_frame[frame_id]['labels'].append(PLAYER_LABEL)
 
-    # Return both ground truths and the list of annotated frame indices
+    # Get total frames from the file info
+    info = root.find('.//{http://lamp.cfar.umd.edu/viper#}file[@name="Information"]')
+    num_frames_elem = info.find('.//{http://lamp.cfar.umd.edu/viperdata#}dvalue')
+    total_frames = int(num_frames_elem.get('value'))
+    
     ground_truths = []
-    annotated_frames = sorted(gt_by_frame.keys())
+    frame_ids = sorted(gt_by_frame.keys())
     
-    for frame_id in annotated_frames:
-        boxes = [list(map(float, box)) for box in gt_by_frame[frame_id]['boxes']]
-        labels = list(gt_by_frame[frame_id]['labels'])
-        ground_truths.append({'boxes': boxes, 'labels': labels})
-    
-    return ground_truths, annotated_frames
+    print(f"[DEBUG] Total video frames: {total_frames}")
+    print(f"[DEBUG] Ground truth frame range: {frame_ids[0] if frame_ids else 'N/A'} ~ {frame_ids[-1] if frame_ids else 'N/A'}")
+    print(f"[DEBUG] Number of annotated frames: {len(frame_ids)}")
 
-
-# In your main detection code:
-if args.metric_path:
-    print("Loading ground truth from:", args.metric_path)
-    gt_by_frame, annotated_frames = evaluate.getGT(args.metric_path)
-    print(f"Loaded {len(gt_by_frame)} frames with annotations")
-    print(f"Annotated frame indices: {annotated_frames[:5]}...{annotated_frames[-5:]}")
-    
-    # Only evaluate frames that have ground truth annotations
-    filtered_detections = []
-    for frame_idx in annotated_frames:
-        if frame_idx < len(all_detections):
-            filtered_detections.append(all_detections[frame_idx])
+    # Create ground truth list for ALL frames (including empty ones)
+    for frame_id in range(total_frames):
+        if frame_id in gt_by_frame:
+            boxes = [list(map(float, box)) for box in gt_by_frame[frame_id]['boxes']]
+            labels = list(gt_by_frame[frame_id]['labels'])
+            ground_truths.append({'boxes': boxes, 'labels': labels})
         else:
-            # If detection is missing for this frame, add empty detection
-            filtered_detections.append({'boxes': [], 'scores': [], 'labels': []})
+            # Empty frame (no annotations)
+            ground_truths.append({'boxes': [], 'labels': []})
     
-    # Now both lists have the same length and correspond to the same frames
-    print(f"Evaluating {len(filtered_detections)} frames with annotations")
-    
-    ap_results = evaluate.compute_ap_map(filtered_detections, gt_by_frame)
-    
-    print("\n===== Evaluation Results =====")
-    print(f"Ball AP@0.5:   {ap_results.get(BALL_LABEL, 0.0):.4f}")
-    print(f"Player AP@0.5: {ap_results.get(PLAYER_LABEL, 0.0):.4f}")
-    print(f"mAP@0.5:       {ap_results.get('mAP', 0.0):.4f}")
+    # Return ground truths and first annotated frame
+    return ground_truths, frame_ids[0] if frame_ids else 0
