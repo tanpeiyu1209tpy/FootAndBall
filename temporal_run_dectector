@@ -38,23 +38,7 @@ def draw_bboxes(image, detections):
     return image
 
 
-def run_detector(model, args):
-    """
-    Auto-detect whether model is single-frame or temporal
-    """
-    # Check if model is temporal
-    if hasattr(model, 'temporal_frames') and model.temporal_frames > 1:
-        # Temporal model
-        return run_temporal_detector(model, args)
-    else:
-        # Single frame model
-        return run_single_frame_detector(model, args)
-
-
-def run_single_frame_detector(model: footandball.FootAndBall, args: argparse.Namespace):
-    """
-    Original single-frame detection function
-    """
+def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
     model.print_summary(show_architecture=False)
     model = model.to(args.device)
 
@@ -76,7 +60,7 @@ def run_single_frame_detector(model: footandball.FootAndBall, args: argparse.Nam
     out_sequence = cv2.VideoWriter(args.out_video, cv2.VideoWriter_fourcc(*'mp4v'), fps,
                                    (frame_width, frame_height))
 
-    print('Processing video with single-frame model: {}'.format(args.path))
+    print('Processing video: {}'.format(args.path))
     pbar = tqdm.tqdm(total=n_frames)
 
     all_detections = []
@@ -129,124 +113,16 @@ def run_single_frame_detector(model: footandball.FootAndBall, args: argparse.Nam
     return all_detections
 
 
-def run_temporal_detector(model, args: argparse.Namespace):
-    """
-    Temporal model detection function
-    """
-    model.print_summary(show_architecture=False)
-    model = model.to(args.device)
-
-    if args.device == 'cpu':
-        print('Loading CPU weights...')
-        state_dict = torch.load(args.weights, map_location=lambda storage, loc: storage)
-    else:
-        print('Loading GPU weights...')
-        state_dict = torch.load(args.weights)
-
-    model.load_state_dict(state_dict)
-    model.eval()
-
-    sequence = cv2.VideoCapture(args.path)
-    fps = sequence.get(cv2.CAP_PROP_FPS)
-    (frame_width, frame_height) = (int(sequence.get(cv2.CAP_PROP_FRAME_WIDTH)),
-                                   int(sequence.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-    n_frames = int(sequence.get(cv2.CAP_PROP_FRAME_COUNT))
-    out_sequence = cv2.VideoWriter(args.out_video, cv2.VideoWriter_fourcc(*'mp4v'), fps,
-                                   (frame_width, frame_height))
-
-    print(f'Processing video with temporal model ({model.temporal_frames} frames): {args.path}')
-    pbar = tqdm.tqdm(total=n_frames)
-
-    all_detections = []
-    frame_buffer = []  # Buffer to store temporal frames
-    temporal_frames = model.temporal_frames
-    
-    frame_idx = 0
-
-    while sequence.isOpened():
-        ret, frame = sequence.read()
-        if not ret:
-            break
-
-        # Add frame to buffer
-        frame_buffer.append(frame.copy())
-        
-        # Keep only the required number of frames
-        if len(frame_buffer) > temporal_frames:
-            frame_buffer.pop(0)
-        
-        # Process only when we have enough frames
-        if len(frame_buffer) == temporal_frames:
-            # Convert frames to tensors
-            temporal_tensors = []
-            for f in frame_buffer:
-                img_tensor = augmentations.numpy2tensor(f)
-                temporal_tensors.append(img_tensor)
-            
-            # Stack temporal frames
-            temporal_input = torch.cat(temporal_tensors, dim=0).unsqueeze(0).to(args.device)
-            
-            with torch.no_grad():
-                detections = model(temporal_input)[0]
-
-                # Filter detections by threshold
-                filtered_boxes = []
-                filtered_scores = []
-                filtered_labels = []
-                
-                for box, score, label in zip(detections["boxes"], detections["scores"], detections["labels"]):
-                    if (label == BALL_LABEL and score >= args.ball_threshold) or \
-                       (label == PLAYER_LABEL and score >= args.player_threshold):
-                        filtered_boxes.append(box)
-                        filtered_scores.append(score)
-                        filtered_labels.append(label)
-                
-                # Update detections with filtered results
-                detections["boxes"] = filtered_boxes
-                detections["scores"] = filtered_scores
-                detections["labels"] = filtered_labels
-
-                # Store detections for evaluation
-                frame_detections = {
-                    "boxes": [box.tolist() for box in detections["boxes"]],
-                    "scores": [score.item() for score in detections["scores"]],
-                    "labels": [label.item() for label in detections["labels"]]
-                }
-                all_detections.append(frame_detections)
-
-            # Draw on current frame (last in buffer)
-            current_frame = frame_buffer[-1].copy()
-            current_frame = draw_bboxes(current_frame, detections)
-            out_sequence.write(current_frame)
-        else:
-            # For first few frames where we don't have enough temporal context
-            # Just write the frame without detections
-            out_sequence.write(frame)
-            all_detections.append({'boxes': [], 'scores': [], 'labels': []})
-        
-        pbar.update(1)
-        frame_idx += 1
-
-    pbar.close()
-    sequence.release()
-    out_sequence.release()
-
-    return all_detections
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', help='path to video', type=str, required=True)
-    parser.add_argument('--model', help='model name (fb1 or temporal_fb1)', type=str, required=True)
+    parser.add_argument('--model', help='model name', type=str, default='fb1')
     parser.add_argument('--weights', help='path to model weights', type=str, required=True)
     parser.add_argument('--ball_threshold', help='ball confidence detection threshold', type=float, default=0.5)
     parser.add_argument('--player_threshold', help='player confidence detection threshold', type=float, default=0.5)
     parser.add_argument('--out_video', help='path to output video', type=str, required=True)
     parser.add_argument('--device', help='device (CPU or CUDA)', type=str, default='cuda:0')
     parser.add_argument('--metric-path', help='Path to ground truth annotation (.xgtf) for evaluation', type=str)
-    # Temporal parameters
-    parser.add_argument('--temporal-frames', help='Number of temporal frames (for temporal models)', type=int, default=3)
-    parser.add_argument('--use-motion-module', help='Use motion module (for temporal models)', action='store_true', default=True)
     args = parser.parse_args()
 
     print('Video path: {}'.format(args.path))
@@ -258,23 +134,9 @@ if __name__ == '__main__':
     assert os.path.exists(args.weights), 'Weights not found'
     assert os.path.exists(args.path), 'Input video not found'
 
-    # Create model based on model type
-    if args.model == 'temporal_fb1':
-        print(f'Creating temporal model with {args.temporal_frames} frames')
-        model = footandball.model_factory(
-            args.model, 'detect',
-            ball_threshold=args.ball_threshold,
-            player_threshold=args.player_threshold,
-            temporal_frames=args.temporal_frames,
-            use_motion_module=args.use_motion_module
-        )
-    else:
-        print('Creating single-frame model')
-        model = footandball.model_factory(
-            args.model, 'detect',
-            ball_threshold=args.ball_threshold,
-            player_threshold=args.player_threshold
-        )
+    model = footandball.model_factory(args.model, 'detect',
+                                      ball_threshold=args.ball_threshold,
+                                      player_threshold=args.player_threshold)
 
     all_detections = run_detector(model, args)
 
