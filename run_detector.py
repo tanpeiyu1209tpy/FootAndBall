@@ -57,7 +57,7 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
         ret, frame = sequence.read()
         if not ret:
             break
-        frame = cv2.resize(frame, (640, 640))
+        frame = cv2.resize(frame, (resize_width, resize_height))
 
         img_tensor = augmentations.numpy2tensor(frame)
         frame_buffer.append(img_tensor)
