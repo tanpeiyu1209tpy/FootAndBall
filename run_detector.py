@@ -24,6 +24,11 @@ def draw_bboxes(image, detections):
             x = int((x1 + x2) / 2)
             y = int((y1 + y2) / 2)
             color = (0, 0, 255)
+            
+            # 添加这两行来计算bounding box尺寸
+            bbox_width = x2 - x1
+            bbox_height = y2 - y1
+            
             radius = max(5, int(min(bbox_width, bbox_height) / 2))
             cv2.circle(image, (int(x), int(y)), radius, color, 2)
             cv2.putText(image, '{:0.2f}'.format(score), (max(0, int(x - radius)), max(0, y - radius - 10)), font, 1, color, 2)
