@@ -498,24 +498,6 @@ def extract_frames(dataset_path, camera_id, frames_path):
     cv2.destroyAllWindows()
     #print(f'Done, number of frames: {count_frames + 1}')
 
-from torchvision import transforms
-
-def make_multiframe_transform(img_size=(720, 1280)):
-    base_transform = transforms.Compose([
-        transforms.Resize(img_size),
-        transforms.ToTensor(),  # Converts PIL to (C, H, W)
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], 
-                             std=[0.229, 0.224, 0.225])
-    ])
-    
-    def multi_frame_transform(sample):
-        images, boxes, labels = sample
-        processed_images = [base_transform(img) for img in images]
-        return processed_images, boxes, labels
-    
-    return multi_frame_transform
-
-
 if __name__ == '__main__':
     # Example to demonstrate usage of module procedures
     print("OpenCV version: " + str(cv2.__version__))
