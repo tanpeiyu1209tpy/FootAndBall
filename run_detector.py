@@ -95,6 +95,7 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
             })
 
         frame = draw_bboxes(frame, detections)
+        frame = cv2.resize(frame, (frame_width, frame_height))
         out_sequence.write(frame)
         pbar.update(1)
 
