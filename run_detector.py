@@ -5,7 +5,6 @@
 #
 # Run FootAndBall detector on ISSIA-CNR Soccer videos
 #
-
 import torch
 import cv2
 import os
@@ -16,7 +15,7 @@ import json
 import network.footandball as footandball
 import data.augmentation as augmentations
 from data.augmentation import PLAYER_LABEL, BALL_LABEL
-import evaluate as metric  # Assumes metric.py is in same directory
+import evaluate  # Your evaluate.py file
 
 
 def draw_bboxes(image, detections):
@@ -77,6 +76,24 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
             img_tensor = img_tensor.unsqueeze(dim=0).to(args.device)
             detections = model(img_tensor)[0]
 
+            # Filter detections by threshold
+            filtered_boxes = []
+            filtered_scores = []
+            filtered_labels = []
+            
+            for box, score, label in zip(detections["boxes"], detections["scores"], detections["labels"]):
+                if (label == BALL_LABEL and score >= args.ball_threshold) or \
+                   (label == PLAYER_LABEL and score >= args.player_threshold):
+                    filtered_boxes.append(box)
+                    filtered_scores.append(score)
+                    filtered_labels.append(label)
+            
+            # Update detections with filtered results
+            detections["boxes"] = filtered_boxes
+            detections["scores"] = filtered_scores
+            detections["labels"] = filtered_labels
+
+            # Store detections for evaluation
             frame_detections = {
                 "boxes": [box.tolist() for box in detections["boxes"]],
                 "scores": [score.item() for score in detections["scores"]],
@@ -123,27 +140,32 @@ if __name__ == '__main__':
 
     all_detections = run_detector(model, args)
 
-    # Load ground truth
+    # Load ground truth and evaluate
     if args.metric_path:
-        print("Loading ground truth from:", args.metric_path)
-        gt_by_frame, gt_start_frame = metric.getGT(args.metric_path)
-        print(f"Loaded {len(gt_by_frame)} frames of ground truth. Start from frame {gt_start_frame}")
+        print("\nLoading ground truth from:", args.metric_path)
+        gt_by_frame, gt_start_frame = evaluate.getGT(args.metric_path)
+        print(f"Loaded {len(gt_by_frame)} frames of ground truth")
 
-        all_detections = all_detections[gt_start_frame:]
-        
-        # Ensure detection and GT have same number of frames
-        if len(all_detections) > len(gt_by_frame):
+        # Make sure we have the same number of frames
+        if len(all_detections) < len(gt_by_frame):
+            print(f"Warning: Video has fewer frames ({len(all_detections)}) than GT ({len(gt_by_frame)})")
+            # Pad detections with empty frames
+            while len(all_detections) < len(gt_by_frame):
+                all_detections.append({'boxes': [], 'scores': [], 'labels': []})
+        elif len(all_detections) > len(gt_by_frame):
+            print(f"Warning: Video has more frames ({len(all_detections)}) than GT ({len(gt_by_frame)})")
+            # Trim detections to match GT length
             all_detections = all_detections[:len(gt_by_frame)]
-        elif len(gt_by_frame) > len(all_detections):
-            gt_by_frame = gt_by_frame[:len(all_detections)]
 
-        ap_results = metric.compute_ap_map(all_detections, gt_by_frame)
+        # Run evaluation
+        ap_results = evaluate.compute_ap_map(all_detections, gt_by_frame)
 
         print("\n===== Evaluation Results =====")
         print(f"Ball AP@0.5:   {ap_results.get(BALL_LABEL, 0.0):.4f}")
         print(f"Player AP@0.5: {ap_results.get(PLAYER_LABEL, 0.0):.4f}")
         print(f"mAP@0.5:       {ap_results.get('mAP', 0.0):.4f}")
 
+        # Save results to file
         with open("ap_results.json", "w", encoding="utf-8") as f:
             json.dump({
                 "ball_ap": ap_results.get(BALL_LABEL, 0.0),
