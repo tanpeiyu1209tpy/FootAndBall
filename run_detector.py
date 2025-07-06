@@ -16,7 +16,7 @@ import json
 import network.footandball as footandball
 import data.augmentation as augmentations
 from data.augmentation import PLAYER_LABEL, BALL_LABEL
-import evaluate as metric  # Assumes metric.py is in same directory
+import evaluate as metric  # 修正：改为这样导入
 
 
 def draw_bboxes(image, detections):
@@ -117,39 +117,41 @@ if __name__ == '__main__':
     assert os.path.exists(args.weights), 'Weights not found'
     assert os.path.exists(args.path), 'Input video not found'
 
+    # 添加标签值检查
+    print(f"BALL_LABEL = {BALL_LABEL}")
+    print(f"PLAYER_LABEL = {PLAYER_LABEL}")
+
     model = footandball.model_factory(args.model, 'detect',
                                       ball_threshold=args.ball_threshold,
                                       player_threshold=args.player_threshold)
 
     all_detections = run_detector(model, args)
 
-    # Load ground truth
+    # 修正：完整的评估部分
     if args.metric_path:
-        print("Loading ground truth from:", args.metric_path)
-        gt_by_frame, gt_start_frame = metric.getGT(args.metric_path)
-        print(f"Loaded {len(gt_by_frame)} frames of ground truth. Start from frame {gt_start_frame}")
-
-        all_detections = all_detections[gt_start_frame:]
-        
-        # Ensure detection and GT have same number of frames
-        if len(all_detections) > len(gt_by_frame):
-            all_detections = all_detections[:len(gt_by_frame)]
-        elif len(gt_by_frame) > len(all_detections):
-            gt_by_frame = gt_by_frame[:len(all_detections)]
-
-        ap_results = metric.compute_ap_map(all_detections, gt_by_frame)
-
-        print("\n===== Evaluation Results =====")
-        print(f"Ball AP@0.5:   {ap_results.get(BALL_LABEL, 0.0):.4f}")
-        print(f"Player AP@0.5: {ap_results.get(PLAYER_LABEL, 0.0):.4f}")
-        print(f"mAP@0.5:       {ap_results.get('mAP', 0.0):.4f}")
-
-        with open("ap_results.json", "w", encoding="utf-8") as f:
-            json.dump({
-                "ball_ap": ap_results.get(BALL_LABEL, 0.0),
-                "player_ap": ap_results.get(PLAYER_LABEL, 0.0),
-                "mAP@0.5": ap_results.get('mAP', 0.0)
-            }, f, indent=2)
-    else:
-        print("No metric path provided. Skipping mAP evaluation.")
+    gt_by_frame, gt_start_frame = metric.getGT(args.metric_path)
+    
+    # 对齐检测结果和GT
+    all_detections = all_detections[gt_start_frame:]
+    min_frames = min(len(all_detections), len(gt_by_frame))
+    all_detections = all_detections[:min_frames]
+    gt_by_frame = gt_by_frame[:min_frames]
+    
+    # 计算mAP@0.5
+    ap_results = metric.compute_ap_map(all_detections, gt_by_frame)
+    
+    print("\n===== Evaluation Results =====")
+    print(f"Ball AP@0.5:   {ap_results.get(BALL_LABEL, 0.0):.4f}")
+    print(f"Player AP@0.5: {ap_results.get(PLAYER_LABEL, 0.0):.4f}")
+    print(f"mAP@0.5:       {ap_results.get('mAP', 0.0):.4f}")
+    
+    # 保存结果
+    with open("ap_results.json", "w", encoding="utf-8") as f:
+        json.dump({
+            "ball_ap": ap_results.get(BALL_LABEL, 0.0),
+            "player_ap": ap_results.get(PLAYER_LABEL, 0.0),
+            "mAP@0.5": ap_results.get('mAP', 0.0)
+        }, f, indent=2)
+else:
+    print("No metric path provided. Skipping mAP evaluation.")
 
