@@ -16,7 +16,7 @@ import json
 import network.footandball as footandball
 import data.augmentation as augmentations
 from data.augmentation import PLAYER_LABEL, BALL_LABEL
-import evaluate  # Assumes metric.py is in same directory
+import evaluate as metric  # Assumes metric.py is in same directory
 
 
 def draw_bboxes(image, detections):
