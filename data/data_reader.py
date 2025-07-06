@@ -106,6 +106,6 @@ class BalancedSampler(Sampler):
 
 
 def collate_fn(batch):
-    """备用collate function"""
+    #alternative collate function
     images, targets = zip(*batch)
     return torch.stack(images, 0), targets
