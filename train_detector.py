@@ -168,7 +168,7 @@ if __name__ == '__main__':
     parser.add_argument('--temporal', dest='use_temporal', help='use temporal fusion', action='store_true')
     parser.add_argument('--temporal-window', help='temporal window size', type=int, default=3)
     parser.add_argument('--fusion-method', help='fusion method', type=str, default='difference',
-                        choices=['difference', 'variance', 'weighted_avg'])
+                        choices=['difference', 'variance', 'weighted_avg', 'attention'])
     
     args = parser.parse_args()
 
