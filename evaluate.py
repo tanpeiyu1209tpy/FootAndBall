@@ -121,10 +121,11 @@ def compute_ap_map(detections, ground_truths, iou_threshold=0.5):
     return aps
 
 
-def getGT(xgtf_path: str) -> t.Tuple[t.List[t.Dict[str, t.List]], int]:
+def getGT(xgtf_path: str) -> t.Tuple[t.List[t.Dict[str, torch.Tensor]], t.List[int]]:
     """
-    Parses the .xgtf ground truth file and returns a list of frame-wise dicts.
-    Each dict contains 'boxes': List[List[float]], 'labels': List[int]
+    Parses the .xgtf ground truth file and returns:
+    - List of frame-wise dicts with 'boxes' and 'labels'
+    - List of frame indices that have annotations
     """
     tree = ET.parse(xgtf_path)
     root = tree.getroot()
@@ -166,13 +167,40 @@ def getGT(xgtf_path: str) -> t.Tuple[t.List[t.Dict[str, t.List]], int]:
                     gt_by_frame[frame_id]['boxes'].append(box)
                     gt_by_frame[frame_id]['labels'].append(PLAYER_LABEL)
 
+    # Return both ground truths and the list of annotated frame indices
     ground_truths = []
-    frame_ids = sorted(gt_by_frame.keys())
-    print(f"[DEBUG] Ground truth frame range: {frame_ids[0]} ~ {frame_ids[-1]}")
-
-    for frame_id in sorted(gt_by_frame.keys()):
+    annotated_frames = sorted(gt_by_frame.keys())
+    
+    for frame_id in annotated_frames:
         boxes = [list(map(float, box)) for box in gt_by_frame[frame_id]['boxes']]
         labels = list(gt_by_frame[frame_id]['labels'])
         ground_truths.append({'boxes': boxes, 'labels': labels})
     
-    return ground_truths, frame_ids[0]
+    return ground_truths, annotated_frames
+
+
+# In your main detection code:
+if args.metric_path:
+    print("Loading ground truth from:", args.metric_path)
+    gt_by_frame, annotated_frames = evaluate.getGT(args.metric_path)
+    print(f"Loaded {len(gt_by_frame)} frames with annotations")
+    print(f"Annotated frame indices: {annotated_frames[:5]}...{annotated_frames[-5:]}")
+    
+    # Only evaluate frames that have ground truth annotations
+    filtered_detections = []
+    for frame_idx in annotated_frames:
+        if frame_idx < len(all_detections):
+            filtered_detections.append(all_detections[frame_idx])
+        else:
+            # If detection is missing for this frame, add empty detection
+            filtered_detections.append({'boxes': [], 'scores': [], 'labels': []})
+    
+    # Now both lists have the same length and correspond to the same frames
+    print(f"Evaluating {len(filtered_detections)} frames with annotations")
+    
+    ap_results = evaluate.compute_ap_map(filtered_detections, gt_by_frame)
+    
+    print("\n===== Evaluation Results =====")
+    print(f"Ball AP@0.5:   {ap_results.get(BALL_LABEL, 0.0):.4f}")
+    print(f"Player AP@0.5: {ap_results.get(PLAYER_LABEL, 0.0):.4f}")
+    print(f"mAP@0.5:       {ap_results.get('mAP', 0.0):.4f}")
