@@ -65,7 +65,7 @@ def train_model(model, optimizer, scheduler, num_epochs, dataloaders, device, mo
             for ndx, (images, boxes, labels) in enumerate(dataloaders[phase]):
                 images = images.to(device)
                 
-                # 处理temporal input的shape
+                # Handling the shape of temporal input
                 if images.dim() == 5:  # [B, T, 3, H, W]
                     h, w = images.shape[-2], images.shape[-1]
                 else:  # [B, 3, H, W]
