@@ -74,7 +74,3 @@ class TemporalBalancedSampler(Sampler):
 
     def __len(self):
         return len(self.sample_ndx)
-
-def collate_fn(batch):
-    images, targets = zip(*batch)
-    return torch.stack(images, 0), targets
