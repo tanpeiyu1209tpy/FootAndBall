@@ -5,60 +5,6 @@ import network.fpn as fpn
 import network.nms as nms
 from data.augmentation import BALL_LABEL, PLAYER_LABEL, BALL_BBOX_SIZE
 
-'''
-class TemporalFusion(nn.Module):
-    """简单的temporal fusion模块"""
-    def __init__(self, channels=32, method='difference'):
-        super().__init__()
-        self.method = method
-        self.channels = channels
-        
-    def forward(self, features, batch_size, temporal_window):
-        """
-        features: [B*T, C, H, W] - FPN输出的特征
-        batch_size: B 
-        temporal_window: T
-        Returns: [B, C, H, W]
-        """
-        if temporal_window == 1:
-            return features
-            
-        # Reshape to [B, T, C, H, W]
-        BT, C, H, W = features.shape
-        features = features.view(batch_size, temporal_window, C, H, W)
-        
-        if self.method == 'difference':
-            # 帧间差异 - 突出运动，抑制静态广告牌等
-            diff_maps = []
-            for i in range(1, temporal_window):
-                diff = torch.abs(features[:, i] - features[:, i-1])
-                diff_maps.append(diff)
-            
-            if len(diff_maps) == 0:
-                fused = features[:, 0]  # 单帧情况
-            else:
-                # 平均所有差异 + 保留一定的原始特征
-                diff_avg = torch.mean(torch.stack(diff_maps, dim=1), dim=1)
-                current_frame = features[:, -1]  # 最新帧
-                fused = 0.7 * diff_avg + 0.3 * current_frame
-                
-        elif self.method == 'variance':
-            # 时间方差 - 运动区域方差大，静态区域方差小
-            fused = torch.var(features, dim=1)
-            
-        elif self.method == 'weighted_avg':
-            # 加权平均 - 最新帧权重最高
-            weights = torch.linspace(0.5, 1.0, temporal_window).to(features.device)
-            weights = weights.view(1, temporal_window, 1, 1, 1)
-            weighted_features = features * weights
-            fused = torch.mean(weighted_features, dim=1)
-            
-        else:
-            # 默认：简单平均
-            fused = torch.mean(features, dim=1)
-            
-        return fused  # [B, C, H, W]
-'''
 class TemporalFusion(nn.Module):
     def __init__(self, channels=32, method='difference'):
         super().__init__()
@@ -225,7 +171,7 @@ class FootAndBall(nn.Module):
             # 为球和球员特征分别创建temporal fusion模块
             self.temporal_fusion_ball = TemporalFusion(channels=32, method=fusion_method)
             self.temporal_fusion_player = TemporalFusion(channels=32, method=fusion_method)
-            print(f"✅ Temporal fusion enabled: {fusion_method}, window={temporal_window}")
+            print(f"Temporal fusion enabled: {fusion_method}, window={temporal_window}")
 
         self.ball_downsampling_factor = 4
         self.player_downsampling_factor = 16
@@ -467,4 +413,4 @@ if __name__ == '__main__':
     for t in x_temporal:
         print(t.shape)
 
-    print('✅ Temporal FootAndBall test completed!')
+    print('Temporal FootAndBall test completed!')
