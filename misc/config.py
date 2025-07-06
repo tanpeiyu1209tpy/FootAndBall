@@ -59,3 +59,23 @@ class Params:
 
 def get_datetime():
     return time.strftime("%Y%m%d_%H%M")
+
+class TemporalParams(Params):
+    """
+    MODIFICATION: Extended parameters for temporal model
+    """
+    def __init__(self, path):
+        super().__init__(path)
+        
+        config = configparser.ConfigParser()
+        config.read(self.path)
+        params = config['DEFAULT']
+        
+        # Additional temporal parameters
+        self.temporal_frames = params.getint('temporal_frames', 3)
+        self.use_motion_module = params.getboolean('use_motion_module', True)
+        
+    def print(self):
+        super().print()
+        print('Temporal frames: {}'.format(self.temporal_frames))
+        print('Use motion module: {}'.format(self.use_motion_module))
