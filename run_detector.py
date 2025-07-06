@@ -24,7 +24,7 @@ def draw_bboxes(image, detections):
             x = int((x1 + x2) / 2)
             y = int((y1 + y2) / 2)
             color = (0, 0, 255)
-            radius = 25
+            radius = max(5, int(min(bbox_width, bbox_height) / 2))
             cv2.circle(image, (int(x), int(y)), radius, color, 2)
             cv2.putText(image, '{:0.2f}'.format(score), (max(0, int(x - radius)), max(0, y - radius - 10)), font, 1, color, 2)
     return image
