@@ -161,13 +161,6 @@ def train(params: Params, override_model=None):
             temporal_frames=temporal_frames,
             use_motion_module=use_motion_module
         )
-    else:
-        # Single frame model
-        dataloaders = make_dataloaders(params)
-        
-        # Create single frame model
-        device = "cuda" if torch.cuda.is_available() else 'cpu'
-        model = footandball.model_factory(model_name, 'train')
     
     print(f'Using model: {model_name}')
     print('Training set: Dataset size: {}'.format(len(dataloaders['train'].dataset)))
