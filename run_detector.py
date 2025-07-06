@@ -45,7 +45,7 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
     frame_height = int(sequence.get(cv2.CAP_PROP_FRAME_HEIGHT))
     resize_width, resize_height = 640, 360
     n_frames = int(sequence.get(cv2.CAP_PROP_FRAME_COUNT))
-    out_sequence = cv2.VideoWriter(args.out_video, cv2.VideoWriter_fourcc(*'mp4v'), fps, (frame_width, frame_height))
+    out_sequence = cv2.VideoWriter(args.out_video, cv2.VideoWriter_fourcc(*'mp4v'), fps, (resize_width, resize_height))
 
     print('Processing video: {}'.format(args.path))
     pbar = tqdm.tqdm(total=n_frames)
