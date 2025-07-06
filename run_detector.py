@@ -110,9 +110,13 @@ def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
                 "labels": [l.item() for l in detections["labels"]],
             })
 
-        frame = draw_bboxes(frame, detections)
-        #frame = cv2.resize(frame, (frame_width, frame_height))
-        out_sequence.write(frame)
+        resized_drawn = draw_bboxes(resized_frame.copy(), detections)
+
+        # ✅ Step 2: upscale to original size (1920x1080)
+        frame_upscaled = cv2.resize(resized_drawn, (frame_width, frame_height))
+        
+        # ✅ Step 3: write video
+        out_sequence.write(frame_upscaled)
         pbar.update(1)
 
     pbar.close()
