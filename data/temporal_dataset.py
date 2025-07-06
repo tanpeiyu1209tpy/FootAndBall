@@ -1,6 +1,6 @@
 import torch
 from data.issia_dataset import IssiaDataset
-
+from data.issia_dataset import create_issia_dataset
 
 class TemporalDatasetWrapper:
     # Wrap the original dataset into a temporal dataset
@@ -44,32 +44,31 @@ class TemporalDatasetWrapper:
             raise ValueError(f"Unknown mode: {self.mode}")
             
     def get_annotations(self, *args, **kwargs):
-        """转发到原始dataset"""
+        # Forward to the original dataset
         return self.dataset.get_annotations(*args, **kwargs)
         
     def get_elems_with_ball(self):
-        """转发到原始dataset"""
+        # Forward to the original dataset
         return self.dataset.get_elems_with_ball()
         
     @property
     def ball_images_ndx(self):
-        """转发到原始dataset"""
+        # Forward to the original dataset
         return self.dataset.ball_images_ndx
         
     @property
     def no_ball_images_ndx(self):
-        """转发到原始dataset"""
+        # Forward to the original dataset
         return self.dataset.no_ball_images_ndx
 
 
 def create_temporal_issia_dataset(dataset_path, cameras, mode, temporal_window=3, 
                                   temporal_mode='repeat', only_ball_frames=False):
-    """创建temporal ISSIA dataset"""
-    # 先创建原始dataset
-    from data.issia_dataset import create_issia_dataset
+    # create temporal ISSIA dataset
+    # create original dataset first
     original_dataset = create_issia_dataset(dataset_path, cameras, mode, only_ball_frames)
     
-    # 包装成temporal dataset
+    # pack it as a temporal dataset
     temporal_dataset = TemporalDatasetWrapper(original_dataset, temporal_window, temporal_mode)
     
     return temporal_dataset
