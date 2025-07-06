@@ -14,14 +14,13 @@ import evaluate
 def draw_bboxes(image, detections):
     font = cv2.FONT_HERSHEY_SIMPLEX
     for box, label, score in zip(detections['boxes'], detections['labels'], detections['scores']):
+        x1, y1, x2, y2 = map(float, box)
         if label == PLAYER_LABEL:
-            x1, y1, x2, y2 = map(float, box)
             color = (255, 0, 0)
             cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
             cv2.putText(image, '{:0.2f}'.format(score), (int(x1), max(0, int(y1) - 10)), font, 1, color, 2)
 
         elif label == BALL_LABEL:
-            x1, y1, x2, y2 = box
             x = int((x1 + x2) / 2)
             y = int((y1 + y2) / 2)
             color = (0, 0, 255)
