@@ -451,30 +451,6 @@ def visualize_detection_results(camera_id, dataset_path, gt_annotations=None, an
     sequence.release()
     cv2.destroyAllWindows()
 
-'''
-def extract_frames(dataset_path, camera_id, frames_path):
-    # Extract frames from the sequence
-    print('Extracting sequence: ' + str(camera_id) + ' from: ' + dataset_path + ' ...')
-    sequence = open_issia_sequence(camera_id, dataset_path)
-    count_frames = -1
-    while (sequence.isOpened()):
-        ret, frame = sequence.read()
-        count_frames += 1
-
-        if not ret:
-            # End of sequence
-            break
-
-        #file_path = os.path.join(frames_path, str(count_frames) + '.png')
-	#cv2.imwrite(file_path, frame, [cv2.IMWRITE_PNG_COMPRESSION, 0])
-	file_path = os.path.join(frames_path, f"{count_frames}.jpg")
-	cv2.imwrite(file_path, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
-        
-
-    sequence.release()
-    cv2.destroyAllWindows()
-    print('Done')
-'''
 def extract_frames(dataset_path, camera_id, frames_path):
     # Extract frames from the sequence
     print('Extracting sequence: ' + str(camera_id) + ' from: ' + dataset_path + ' ...')
