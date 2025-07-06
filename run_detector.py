@@ -4,6 +4,8 @@ import os
 import argparse
 import tqdm
 import json
+import gc
+from collections import deque
 
 import network.footandball as footandball
 import data.augmentation as augmentations
@@ -11,115 +13,256 @@ from data.augmentation import PLAYER_LABEL, BALL_LABEL
 import evaluate
 
 
+def get_memory_usage():
+    """获取当前GPU内存使用情况"""
+    if torch.cuda.is_available():
+        allocated = torch.cuda.memory_allocated() / 1024**3
+        cached = torch.cuda.memory_reserved() / 1024**3
+        return allocated, cached
+    return 0, 0
+
+
+def clear_memory():
+    """清理内存"""
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
 def draw_bboxes(image, detections):
     font = cv2.FONT_HERSHEY_SIMPLEX
     for box, label, score in zip(detections['boxes'], detections['labels'], detections['scores']):
-        x1, y1, x2, y2 = map(float, box)
         if label == PLAYER_LABEL:
+            x1, y1, x2, y2 = box
             color = (255, 0, 0)
             cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
             cv2.putText(image, '{:0.2f}'.format(score), (int(x1), max(0, int(y1) - 10)), font, 1, color, 2)
 
         elif label == BALL_LABEL:
+            x1, y1, x2, y2 = box
             x = int((x1 + x2) / 2)
             y = int((y1 + y2) / 2)
             color = (0, 0, 255)
             
-            # 添加这两行来计算bounding box尺寸
             bbox_width = x2 - x1
             bbox_height = y2 - y1
+            radius = max(5, min(25, int(min(bbox_width, bbox_height) / 2)))
             
-            radius = max(5, int(min(bbox_width, bbox_height) / 2))
             cv2.circle(image, (int(x), int(y)), radius, color, 2)
             cv2.putText(image, '{:0.2f}'.format(score), (max(0, int(x - radius)), max(0, y - radius - 10)), font, 1, color, 2)
     return image
 
 
-def run_detector(model: footandball.FootAndBall, args: argparse.Namespace):
-    resize_width, resize_height = 640, 360
+def estimate_memory_usage(frame_width, frame_height, temporal_window, batch_size=1):
+    """估算内存使用量"""
+    # 单帧内存使用 (3 channels * height * width * 4 bytes for float32)
+    single_frame_mb = (3 * frame_height * frame_width * 4) / (1024 * 1024)
+    
+    # 时间窗口内存
+    temporal_mb = single_frame_mb * temporal_window * batch_size
+    
+    # 模型参数和梯度（估算）
+    model_mb = 200  # 大概估算
+    
+    total_mb = temporal_mb + model_mb
+    return total_mb
 
+
+def adaptive_resize_for_memory(frame_width, frame_height, max_memory_mb=4000):
+    """根据内存限制自适应调整分辨率"""
+    current_mb = estimate_memory_usage(frame_width, frame_height, 1)
+    
+    if current_mb <= max_memory_mb:
+        return frame_width, frame_height, 1.0
+    
+    # 计算需要的缩放比例
+    scale = (max_memory_mb / current_mb) ** 0.5
+    new_width = int(frame_width * scale)
+    new_height = int(frame_height * scale)
+    
+    # 确保是偶数（某些编码器要求）
+    new_width = (new_width // 2) * 2
+    new_height = (new_height // 2) * 2
+    
+    return new_width, new_height, scale
+
+
+def run_detector_memory_efficient(model: footandball.FootAndBall, args: argparse.Namespace):
     model.print_summary(show_architecture=False)
     model = model.to(args.device)
 
-    state_dict = torch.load(args.weights, map_location=args.device)
-    model.load_state_dict(state_dict)
-    model.eval()
+    try:
+        state_dict = torch.load(args.weights, map_location=args.device)
+        model.load_state_dict(state_dict)
+        model.eval()
+    except Exception as e:
+        print(f"Error loading model weights: {e}")
+        return None
 
     sequence = cv2.VideoCapture(args.path)
+    if not sequence.isOpened():
+        print(f"Error: Cannot open video file {args.path}")
+        return None
+        
     fps = sequence.get(cv2.CAP_PROP_FPS)
-    frame_width = int(sequence.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_height = int(sequence.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    orig_width = int(sequence.get(cv2.CAP_PROP_FRAME_WIDTH))
+    orig_height = int(sequence.get(cv2.CAP_PROP_FRAME_HEIGHT))
     n_frames = int(sequence.get(cv2.CAP_PROP_FRAME_COUNT))
-    out_sequence = cv2.VideoWriter(args.out_video, cv2.VideoWriter_fourcc(*'mp4v'), fps, (frame_width, frame_height))
+    
+    print(f"Original video: {orig_width}x{orig_height}, {n_frames} frames")
+    
+    # 根据内存限制调整分辨率
+    if args.auto_resize:
+        proc_width, proc_height, scale = adaptive_resize_for_memory(
+            orig_width, orig_height, args.max_memory_mb
+        )
+        print(f"Processing resolution: {proc_width}x{proc_height} (scale: {scale:.3f})")
+        need_resize = scale < 0.99
+    else:
+        proc_width, proc_height = orig_width, orig_height
+        scale = 1.0
+        need_resize = False
+    
+    # 估算内存使用
+    estimated_mb = estimate_memory_usage(proc_width, proc_height, args.temporal_window)
+    print(f"Estimated memory usage: {estimated_mb:.1f} MB")
+    
+    os.makedirs(os.path.dirname(args.out_video), exist_ok=True)
+    out_sequence = cv2.VideoWriter(args.out_video, cv2.VideoWriter_fourcc(*'mp4v'), fps, (orig_width, orig_height))
 
     print('Processing video: {}'.format(args.path))
     pbar = tqdm.tqdm(total=n_frames)
 
-    frame_buffer = []
+    frame_buffer = deque(maxlen=args.temporal_window if args.temporal else 1)
     all_detections = []
+    frame_count = 0
+    
+    # 内存监控
+    initial_alloc, initial_cached = get_memory_usage()
+    print(f"Initial GPU memory: {initial_alloc:.2f}GB allocated, {initial_cached:.2f}GB cached")
 
-    while sequence.isOpened():
-        ret, frame = sequence.read()
-        if not ret:
-            break
+    try:
+        while sequence.isOpened():
+            ret, frame = sequence.read()
+            if not ret:
+                break
 
-        # Resize for model input
-        resized_frame = cv2.resize(frame, (resize_width, resize_height))
-        img_tensor = augmentations.numpy2tensor(resized_frame)
-        frame_buffer.append(img_tensor)
+            # 处理帧
+            if need_resize:
+                # resize到处理分辨率
+                processed_frame = cv2.resize(frame, (proc_width, proc_height))
+            else:
+                processed_frame = frame
 
-        # Maintain temporal window
-        if args.temporal:
-            if len(frame_buffer) < args.temporal_window:
-                pbar.update(1)
-                continue
-            elif len(frame_buffer) > args.temporal_window:
-                frame_buffer.pop(0)
-            input_tensor = torch.stack(frame_buffer).unsqueeze(0).to(args.device)  # [1, T, 3, H, W]
-        else:
-            input_tensor = img_tensor.unsqueeze(0).to(args.device)  # [1, 3, H, W]
+            img_tensor = augmentations.numpy2tensor(processed_frame)
+            frame_buffer.append(img_tensor)
 
-        with torch.no_grad():
-            detections = model(input_tensor)[0]
+            # 时间窗口处理
+            if args.temporal:
+                if len(frame_buffer) < args.temporal_window:
+                    padded_buffer = list(frame_buffer)
+                    while len(padded_buffer) < args.temporal_window:
+                        padded_buffer.insert(0, frame_buffer[0])
+                    input_tensor = torch.stack(padded_buffer).unsqueeze(0).to(args.device)
+                else:
+                    input_tensor = torch.stack(list(frame_buffer)).unsqueeze(0).to(args.device)
+            else:
+                input_tensor = img_tensor.unsqueeze(0).to(args.device)
 
-        # === Compute scale per frame ===
-        scale_x = frame.shape[1] / resize_width
-        scale_y = frame.shape[0] / resize_height
+            with torch.no_grad():
+                detections = model(input_tensor)[0]
 
-        filtered_boxes, filtered_scores, filtered_labels = [], [], []
-        for box, score, label in zip(detections["boxes"], detections["scores"], detections["labels"]):
-            if (label == BALL_LABEL and score >= args.ball_threshold) or \
-               (label == PLAYER_LABEL and score >= args.player_threshold):
-                x1, y1, x2, y2 = box.tolist()
-                x1 *= scale_x
-                x2 *= scale_x
-                y1 *= scale_y
-                y2 *= scale_y
-                box = torch.tensor([x1, y1, x2, y2])
-                filtered_boxes.append(box)
-                filtered_scores.append(score)
-                filtered_labels.append(label)
+                filtered_boxes, filtered_scores, filtered_labels = [], [], []
+                
+                if len(detections["boxes"]) > 0:
+                    for box, score, label in zip(detections["boxes"], detections["scores"], detections["labels"]):
+                        score_val = score.item() if torch.is_tensor(score) else score
+                        label_val = label.item() if torch.is_tensor(label) else label
+                        
+                        if (label_val == BALL_LABEL and score_val >= args.ball_threshold) or \
+                           (label_val == PLAYER_LABEL and score_val >= args.player_threshold):
+                            
+                            if torch.is_tensor(box):
+                                box_coords = box.tolist()
+                            else:
+                                box_coords = box
+                            
+                            x1, y1, x2, y2 = box_coords
+                            
+                            # 如果resize了，需要缩放坐标回原始分辨率
+                            if need_resize:
+                                x1 = x1 / scale
+                                x2 = x2 / scale
+                                y1 = y1 / scale
+                                y2 = y2 / scale
+                            
+                            # 确保坐标在合理范围内
+                            x1 = max(0, min(x1, orig_width))
+                            x2 = max(0, min(x2, orig_width))
+                            y1 = max(0, min(y1, orig_height))
+                            y2 = max(0, min(y2, orig_height))
+                            
+                            if x2 > x1 and y2 > y1:
+                                filtered_boxes.append([x1, y1, x2, y2])
+                                filtered_scores.append(score_val)
+                                filtered_labels.append(label_val)
 
-        detections["boxes"] = filtered_boxes
-        detections["scores"] = filtered_scores
-        detections["labels"] = filtered_labels
+                # 清理GPU内存
+                del input_tensor
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
 
-        all_detections.append({
-            "boxes": [b.tolist() for b in filtered_boxes],
-            "scores": [s.item() for s in filtered_scores],
-            "labels": [l.item() for l in filtered_labels],
-        })
+                detections["boxes"] = filtered_boxes
+                detections["scores"] = filtered_scores
+                detections["labels"] = filtered_labels
 
-        # Draw on original resolution
-        frame = draw_bboxes(frame, detections)
-        out_sequence.write(frame)
-        pbar.update(1)
+                all_detections.append({
+                    "boxes": filtered_boxes,
+                    "scores": filtered_scores,
+                    "labels": filtered_labels,
+                })
 
-    pbar.close()
-    sequence.release()
-    out_sequence.release()
+            # 在原始分辨率上绘制
+            frame = draw_bboxes(frame, detections)
+            out_sequence.write(frame)
+            
+            frame_count += 1
+            pbar.update(1)
+            
+            # 定期内存清理和监控
+            if frame_count % args.memory_check_interval == 0:
+                clear_memory()
+                alloc, cached = get_memory_usage()
+                if frame_count % (args.memory_check_interval * 10) == 0:  # 每1000帧打印一次
+                    print(f"\nFrame {frame_count}: {alloc:.2f}GB allocated, {cached:.2f}GB cached")
+                
+                # 内存使用过高时的处理
+                if alloc > args.max_gpu_memory_gb:
+                    print(f"Warning: GPU memory usage ({alloc:.2f}GB) exceeds limit ({args.max_gpu_memory_gb}GB)")
+                    clear_memory()
+
+    except RuntimeError as e:
+        if "out of memory" in str(e):
+            print(f"\nOut of memory error at frame {frame_count}")
+            print("Suggestions:")
+            print("1. Use --auto-resize flag")
+            print("2. Reduce --max-memory-mb")
+            print("3. Disable temporal fusion (remove --temporal)")
+            print("4. Use CPU instead of GPU")
+        raise e
+    except Exception as e:
+        print(f"Error during processing: {e}")
+        return None
+    finally:
+        pbar.close()
+        sequence.release()
+        out_sequence.release()
+        clear_memory()
+        
+    final_alloc, final_cached = get_memory_usage()
+    print(f"Final GPU memory: {final_alloc:.2f}GB allocated, {final_cached:.2f}GB cached")
+    
     return all_detections
-
 
 
 if __name__ == '__main__':
@@ -138,6 +281,16 @@ if __name__ == '__main__':
     parser.add_argument('--temporal-window', type=int, default=3, help='Number of frames in temporal window')
     parser.add_argument('--fusion-method', type=str, default='difference',
                         choices=['difference', 'variance', 'weighted_avg', 'attention'], help='Fusion method type')
+    
+    # 内存优化参数
+    parser.add_argument('--auto-resize', action='store_true', help='Automatically resize based on memory limit')
+    parser.add_argument('--max-memory-mb', type=int, default=4000, help='Maximum memory usage in MB')
+    parser.add_argument('--max-gpu-memory-gb', type=float, default=8.0, help='Maximum GPU memory in GB')
+    parser.add_argument('--memory-check-interval', type=int, default=100, help='Memory check interval (frames)')
+    
+    # 批处理参数
+    parser.add_argument('--batch-process', action='store_true', help='Process video in batches')
+    parser.add_argument('--batch-size', type=int, default=1000, help='Batch size in frames')
 
     args = parser.parse_args()
 
@@ -146,50 +299,82 @@ if __name__ == '__main__':
     print('Weights: {}'.format(args.weights))
     print('Output video: {}'.format(args.out_video))
     print('Device: {}'.format(args.device))
+    print(f'Memory optimization: auto_resize={args.auto_resize}, max_memory={args.max_memory_mb}MB')
+    
     if args.temporal:
         print(f'Temporal mode: ON | Window: {args.temporal_window} | Method: {args.fusion_method}')
 
-    assert os.path.exists(args.weights), 'Weights not found'
-    assert os.path.exists(args.path), 'Input video not found'
+    if not os.path.exists(args.weights):
+        print(f'Error: Weights file not found: {args.weights}')
+        exit(1)
+    if not os.path.exists(args.path):
+        print(f'Error: Input video not found: {args.path}')
+        exit(1)
 
-    model = footandball.model_factory(
-        args.model, 'detect',
-        ball_threshold=args.ball_threshold,
-        player_threshold=args.player_threshold,
-        use_temporal_fusion=args.temporal,
-        temporal_window=args.temporal_window,
-        fusion_method=args.fusion_method
-    )
+    # 检查设备可用性
+    if args.device.startswith('cuda'):
+        if not torch.cuda.is_available():
+            print('Warning: CUDA not available, switching to CPU')
+            args.device = 'cpu'
+        else:
+            gpu_props = torch.cuda.get_device_properties(0)
+            gpu_memory_gb = gpu_props.total_memory / 1024**3
+            print(f'GPU: {gpu_props.name}, Memory: {gpu_memory_gb:.1f} GB')
 
-    all_detections = run_detector(model, args)
+    try:
+        model = footandball.model_factory(
+            args.model, 'detect',
+            ball_threshold=args.ball_threshold,
+            player_threshold=args.player_threshold,
+            use_temporal_fusion=args.temporal,
+            temporal_window=args.temporal_window,
+            fusion_method=args.fusion_method
+        )
+    except Exception as e:
+        print(f'Error creating model: {e}')
+        exit(1)
+
+    all_detections = run_detector_memory_efficient(model, args)
+    
+    if all_detections is None:
+        print("Detection failed")
+        exit(1)
+
+    print(f"Successfully processed {len(all_detections)} frames")
 
     # === Evaluation ===
     if args.metric_path:
         print("\nLoading ground truth from:", args.metric_path)
-        gt_by_frame, gt_start_frame = evaluate.getGT(args.metric_path)
-        print(f"Loaded {len(gt_by_frame)} frames of ground truth")
+        try:
+            gt_by_frame, gt_start_frame = evaluate.getGT(args.metric_path)
+            print(f"Loaded {len(gt_by_frame)} frames of ground truth")
 
-        if len(all_detections) < len(gt_by_frame):
-            print(f"Warning: Video has fewer frames ({len(all_detections)}) than GT ({len(gt_by_frame)})")
-            while len(all_detections) < len(gt_by_frame):
-                all_detections.append({'boxes': [], 'scores': [], 'labels': []})
-        elif len(all_detections) > len(gt_by_frame):
-            print(f"Warning: Video has more frames ({len(all_detections)}) than GT ({len(gt_by_frame)})")
-            all_detections = all_detections[:len(gt_by_frame)]
+            if len(all_detections) < len(gt_by_frame):
+                print(f"Warning: Video has fewer frames ({len(all_detections)}) than GT ({len(gt_by_frame)})")
+                while len(all_detections) < len(gt_by_frame):
+                    all_detections.append({'boxes': [], 'scores': [], 'labels': []})
+            elif len(all_detections) > len(gt_by_frame):
+                print(f"Warning: Video has more frames ({len(all_detections)}) than GT ({len(gt_by_frame)})")
+                all_detections = all_detections[:len(gt_by_frame)]
 
-        ap_results = evaluate.compute_ap_map(all_detections, gt_by_frame)
+            ap_results = evaluate.compute_ap_map(all_detections, gt_by_frame)
 
-        print("\n===== Evaluation Results =====")
-        print(f"Ball AP@0.5:   {ap_results.get(BALL_LABEL, 0.0):.4f}")
-        print(f"Player AP@0.5: {ap_results.get(PLAYER_LABEL, 0.0):.4f}")
-        print(f"mAP@0.5:       {ap_results.get('mAP', 0.0):.4f}")
+            print("\n===== Evaluation Results =====")
+            print(f"Ball AP@0.5:   {ap_results.get(BALL_LABEL, 0.0):.4f}")
+            print(f"Player AP@0.5: {ap_results.get(PLAYER_LABEL, 0.0):.4f}")
+            print(f"mAP@0.5:       {ap_results.get('mAP', 0.0):.4f}")
 
-        with open("ap_results.json", "w", encoding="utf-8") as f:
-            json.dump({
-                "ball_ap": ap_results.get(BALL_LABEL, 0.0),
-                "player_ap": ap_results.get(PLAYER_LABEL, 0.0),
-                "mAP@0.5": ap_results.get('mAP', 0.0)
-            }, f, indent=2)
+            with open("ap_results.json", "w", encoding="utf-8") as f:
+                json.dump({
+                    "ball_ap": ap_results.get(BALL_LABEL, 0.0),
+                    "player_ap": ap_results.get(PLAYER_LABEL, 0.0),
+                    "mAP@0.5": ap_results.get('mAP', 0.0)
+                }, f, indent=2)
+                
+            print("Results saved to ap_results.json")
+        except Exception as e:
+            print(f"Error during evaluation: {e}")
     else:
         print("No metric path provided. Skipping mAP evaluation.")
-
+    
+    print("Processing completed successfully!")
