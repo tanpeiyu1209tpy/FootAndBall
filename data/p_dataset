@@ -1,0 +1,122 @@
+import torch
+import os
+from torchvision.utils import save_image # 用于保存图片
+
+
+
+class TemporalDatasetWrapper:
+    # Wrap the original dataset into a temporal dataset
+    def __init__(self, original_dataset, temporal_window=3, mode='repeat', save_dir=None):
+        """
+        Args:
+            original_dataset: original IssiaDataset
+            temporal_window: temporal window size
+            mode: repeat current frame
+            save_dir: Directory to save generated temporal images for visualization. If None, images are not saved.
+        """
+        self.dataset = original_dataset
+        self.temporal_window = temporal_window
+        self.mode = mode
+        self.save_dir = save_dir
+        if self.save_dir:
+            os.makedirs(self.save_dir, exist_ok=True) # 确保保存目录存在
+            print(f"Temporal dataset wrapper: {mode} mode, window={temporal_window}. Saving examples to {self.save_dir}")
+        else:
+            print(f"Temporal dataset wrapper: {mode} mode, window={temporal_window}")
+        
+    def __len__(self):
+        return len(self.dataset)
+        
+    def __getitem__(self, idx):
+        if self.mode == 'repeat':
+            image, boxes, labels = self.dataset[idx] # 假设 image 是 [C, H, W] 的 Tensor
+            
+            temporal_images = []
+            for t in range(self.temporal_window):
+                current_image_to_add = image
+                if t == 0:
+                    # The first frame remains as is
+                    pass # current_image_to_add 已经是 image
+                else:
+                    # Add tiny random noise (standard deviation = 0.01)
+                    noise = torch.randn_like(image) * 0.01
+                    noisy_image = image + noise
+                    current_image_to_add = torch.clamp(noisy_image, 0, 1) # make sure range between [0,1]
+                
+                temporal_images.append(current_image_to_add)
+
+                # --- 添加图片保存代码 ---
+                if self.save_dir:
+                    # 为每张图片生成一个唯一文件名
+                    filename = f"sample_{idx}_frame_{t}.png"
+                    filepath = os.path.join(self.save_dir, filename)
+                    # save_image 期望输入是 [C, H, W] 或 [N, C, H, W]
+                    save_image(current_image_to_add, filepath)
+                    # print(f"Saved {filepath}") # 可以选择打印保存信息
+                # --- 保存代码结束 ---
+
+            temporal_images = torch.stack(temporal_images, dim=0) # [T, C, H, W]
+            return temporal_images, boxes, labels
+        
+        else:
+            raise ValueError(f"Unknown mode: {self.mode}")
+            
+    def get_annotations(self, *args, **kwargs):
+        return self.dataset.get_annotations(*args, **kwargs)
+        
+    def get_elems_with_ball(self):
+        return self.dataset.get_elems_with_ball()
+        
+    @property
+    def ball_images_ndx(self):
+        return self.dataset.ball_images_ndx
+        
+    @property
+    def no_ball_images_ndx(self):
+        return self.dataset.no_ball_images_ndx
+
+# 你的 create_temporal_issia_dataset 函数
+def create_temporal_issia_dataset(dataset_path, cameras, mode, temporal_window=3, 
+                                 temporal_mode='repeat', only_ball_frames=False, save_example_images_dir=None):
+    original_dataset = create_issia_dataset(dataset_path, cameras, mode, only_ball_frames)
+    temporal_dataset = TemporalDatasetWrapper(original_dataset, temporal_window, temporal_mode, save_dir=save_example_images_dir)
+    return temporal_dataset
+
+# ----------------------------------------------------
+# 示例用法 (假设你有一个 create_issia_dataset 函数)
+# ----------------------------------------------------
+
+# 假设 create_issia_dataset 是这样的 (你需要替换为你的实际实现)
+# from PIL import Image
+# class MockIssiaDataset:
+#     def __init__(self, size=(3, 224, 224)):
+#         self.size = size
+#     def __len__(self): return 10 # 假设有10张图片
+#     def __getitem__(self, idx):
+#         # 返回一个随机图像，模拟真实数据
+#         img = torch.rand(self.size) # 模拟一张随机图片
+#         boxes = torch.tensor([[0.1, 0.1, 0.2, 0.2]])
+#         labels = torch.tensor([0])
+#         return img, boxes, labels
+# def create_issia_dataset(dataset_path, cameras, mode, only_ball_frames):
+#    return MockIssiaDataset()
+
+
+# 使用示例：
+# 1. 设置一个目录来保存图片
+# example_save_dir = "temporal_dataset_examples"
+# 2. 创建数据集实例，并传入保存目录
+# my_temporal_dataset = create_temporal_issia_dataset(
+#     dataset_path="path/to/your/issia_dataset", 
+#     cameras="some_camera", 
+#     mode="train", 
+#     temporal_window=5, 
+#     save_example_images_dir=example_save_dir # 将保存目录传递给封装器
+# )
+
+# 3. 遍历数据集的一部分，触发图像生成和保存
+# for i in range(3): # 例如，只处理前3个样本
+#     temporal_images, boxes, labels = my_temporal_dataset[i]
+#     print(f"Processed sample {i}: temporal_images shape {temporal_images.shape}")
+
+# 运行后，你会在 'temporal_dataset_examples' 目录下看到类似 sample_0_frame_0.png, sample_0_frame_1.png 等文件。
