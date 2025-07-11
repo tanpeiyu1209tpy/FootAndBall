@@ -6,7 +6,7 @@ from torchvision.utils import save_image # 用于保存图片
 
 class TemporalDatasetWrapper:
     # Wrap the original dataset into a temporal dataset
-    def __init__(self, original_dataset, temporal_window=3, mode='repeat', save_dir=None):
+    def __init__(self, original_dataset, temporal_window=3, mode='repeat', save_dir=None): # <--- 添加了 save_dir 参数
         """
         Args:
             original_dataset: original IssiaDataset
@@ -17,9 +17,9 @@ class TemporalDatasetWrapper:
         self.dataset = original_dataset
         self.temporal_window = temporal_window
         self.mode = mode
-        self.save_dir = save_dir
-        if self.save_dir:
-            os.makedirs(self.save_dir, exist_ok=True) # 确保保存目录存在
+        self.save_dir = save_dir # <--- 保存 save_dir
+        if self.save_dir: # <--- 如果提供了保存目录，则创建
+            os.makedirs(self.save_dir, exist_ok=True)
             print(f"Temporal dataset wrapper: {mode} mode, window={temporal_window}. Saving examples to {self.save_dir}")
         else:
             print(f"Temporal dataset wrapper: {mode} mode, window={temporal_window}")
@@ -29,14 +29,16 @@ class TemporalDatasetWrapper:
         
     def __getitem__(self, idx):
         if self.mode == 'repeat':
-            image, boxes, labels = self.dataset[idx] # 假设 image 是 [C, H, W] 的 Tensor
+            image, boxes, labels = self.dataset[idx] # image is already a [C, H, W] Tensor
             
             temporal_images = []
             for t in range(self.temporal_window):
-                current_image_to_add = image
+                current_image_to_add = image # Default to original image for frame 0, or base for noisy frames
+
                 if t == 0:
                     # The first frame remains as is
-                    pass # current_image_to_add 已经是 image
+                    # No modification to current_image_to_add needed as it's already 'image'
+                    pass
                 else:
                     # Add tiny random noise (standard deviation = 0.01)
                     noise = torch.randn_like(image) * 0.01
@@ -50,9 +52,7 @@ class TemporalDatasetWrapper:
                     # 为每张图片生成一个唯一文件名
                     filename = f"sample_{idx}_frame_{t}.png"
                     filepath = os.path.join(self.save_dir, filename)
-                    # save_image 期望输入是 [C, H, W] 或 [N, C, H, W]
                     save_image(current_image_to_add, filepath)
-                    # print(f"Saved {filepath}") # 可以选择打印保存信息
                 # --- 保存代码结束 ---
 
             temporal_images = torch.stack(temporal_images, dim=0) # [T, C, H, W]
