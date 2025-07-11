@@ -77,9 +77,13 @@ class TemporalDatasetWrapper:
 
 # 你的 create_temporal_issia_dataset 函数
 def create_temporal_issia_dataset(dataset_path, cameras, mode, temporal_window=3, 
-                                 temporal_mode='repeat', only_ball_frames=False, save_example_images_dir=None):
+                                 temporal_mode='repeat', only_ball_frames=False, save_example_images_dir=None): # <--- 添加了 save_example_images_dir 参数
+    # create original dataset first
     original_dataset = create_issia_dataset(dataset_path, cameras, mode, only_ball_frames)
-    temporal_dataset = TemporalDatasetWrapper(original_dataset, temporal_window, temporal_mode, save_dir=save_example_images_dir)
+    
+    # pack it as a temporal dataset
+    temporal_dataset = TemporalDatasetWrapper(original_dataset, temporal_window, temporal_mode, save_dir=save_example_images_dir) # <--- 传递给 TemporalDatasetWrapper
+    
     return temporal_dataset
 
 # ----------------------------------------------------
